@@ -1,11 +1,13 @@
-// service-worker.js – Offline-first PWA for PHS Stamper (GitHub Pages)
+// service-worker.js – Offline-first PWA for Pukekohe HS Photo Stamper
 
-// App is hosted at: https://pukekohetech.github.io/phsphoto/
-const ROOT = '/phsphoto/';
+// Figure out the root path from the service worker scope so this works
+// on GitHub Pages at /phsphoto/ or any other subfolder.
+const ROOT = new URL(self.registration.scope).pathname;
 
-// Bump version when core assets change
-const CACHE_NAME = 'phs-stamper-v225';
+// Bump this when you change core assets so old caches are cleaned up
+const CACHE_NAME = 'phs-stamper-v246';
 
+// Core assets to cache for offline use
 const CORE_ASSETS = [
   ROOT,
   ROOT + 'index.html',
@@ -13,11 +15,15 @@ const CORE_ASSETS = [
   ROOT + 'script.js',
   ROOT + 'selections.json',
   ROOT + 'manifest.webmanifest',
+  ROOT + 'icon-152.png',
   ROOT + 'icon-192.png',
   ROOT + 'icon-512.png',
-  ROOT + 'phs_crest.png'
+  ROOT + 'crest-152.png',
+  ROOT + 'crest-192.png',
+  ROOT + 'crest-512.png'
 ];
 
+// Install – cache core assets
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -26,46 +32,42 @@ self.addEventListener('install', event => {
   );
 });
 
+// Activate – clean up old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
-    Promise.all([
-      self.clients.claim(),
-      caches.keys().then(keys =>
-        Promise.all(
-          keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-        )
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(key => key.startsWith('phs-stamper-') && key !== CACHE_NAME)
+          .map(key => caches.delete(key))
       )
-    ])
+    ).then(() => self.clients.claim())
   );
 });
 
+// Fetch – network-first with cache fallback
 self.addEventListener('fetch', event => {
   const req = event.request;
 
-  // Only handle GET over http/https
-  if (req.method !== 'GET' || !req.url.startsWith('http')) return;
+  // Only handle GET requests
+  if (req.method !== 'GET') return;
 
-  // When the app is launched / navigated to (e.g. from home-screen icon),
-  // always fall back to the cached index.html if offline.
-  if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req).catch(() => caches.match(ROOT + 'index.html'))
-    );
-    return;
-  }
-
-  // For other requests: cache-first, then network, then offline fallback
   event.respondWith(
     caches.match(req).then(cached => {
       const network = fetch(req)
         .then(response => {
-          if (response && response.status === 200) {
+          // Cache successful same-origin responses
+          if (response && response.status === 200 && response.type === 'basic') {
             caches.open(CACHE_NAME).then(cache => cache.put(req, response.clone()));
           }
           return response;
         })
-        .catch(() => cached || caches.match(ROOT + 'index.html'));
+        .catch(() => {
+          // Offline: fall back to cache, or index.html as a last resort
+          return cached || caches.match(ROOT + 'index.html');
+        });
 
+      // Prefer cached version if we have it, otherwise use network
       return cached || network;
     })
   );

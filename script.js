@@ -1,5 +1,5 @@
 // ---------------------------
-// Element references
+// Element references 
 // ---------------------------
 const html = document.documentElement;
 

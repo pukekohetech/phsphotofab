@@ -61,29 +61,63 @@
           </div>
         </div>
 
-        <!-- SUBJECT / PROJECT DROPDOWNS DRIVEN BY selections.json -->
         <div class="row row--2">
           <div class="stack">
-            <label for="subjectSelect">Subject / Level</label>
-            <select id="subjectSelect">
-              <option value="">Select subject…</option>
-            </select>
+            <label for="subjectSelect">Subject</label>
+            <select id="subjectSelect"></select>
           </div>
           <div class="stack">
-            <label for="projectSelect">Project</label>
-            <select id="projectSelect" disabled>
-              <option value="">Select project…</option>
-            </select>
+            <label for="projectSelect">Project / context</label>
+            <select id="projectSelect"></select>
           </div>
         </div>
 
         <div id="customProjectGroup" class="stack" style="display:none;">
-          <label for="customProjectInput">Own project (describe)</label>
-          <input id="customProjectInput" placeholder="e.g., Custom project" />
+          <label for="customProjectInput">Custom project</label>
+          <input id="customProjectInput" placeholder="e.g., 10DGT – Website layout" />
         </div>
 
-        <!-- Hidden subject text used for stamp + persistence -->
-        <input id="subject" type="hidden" />
+        <div class="stack">
+          <label for="subject">Custom stamp text (optional)</label>
+          <textarea id="subject" rows="2" placeholder="Useful for extra context or when subject / project isn’t in the list."></textarea>
+          <p class="hint">This text will appear on the stamp along with the student + teacher.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="stack">
+          <div class="inline">
+            <h2>Preview</h2>
+            <span class="pill muted">Stamp overlay</span>
+          </div>
+
+          <div class="stack">
+            <label for="overlayText">Stamp preview</label>
+            <div class="overlay-wrap">
+              <canvas id="canvas" width="1280" height="720" style="display:none;"></canvas>
+              <video id="video" class="media" playsinline muted></video>
+              <div id="overlayText" class="stamp-overlay">
+                <span>
+                  Student Name – Teacher Name
+                  <br>Pukekohe High School • Class / Project
+                  <br>Extra description about what’s happening in the photo
+                </span>
+              </div>
+            </div>
+            <p class="hint">
+              This is roughly how your stamp will appear on the final image.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row--2">
+      <div class="panel stack">
+        <div class="inline">
+          <h2>Capture</h2>
+          <span class="pill">Camera or file</span>
+        </div>
 
         <div class="row row--2">
           <div class="stack">
@@ -96,49 +130,63 @@
           </div>
         </div>
 
- <div class="panel stack">
+        <div class="btn-row">
+  <button id="shootBtn" class="primary" disabled>Capture & Stamp (Camera)</button>
+  <button id="flipBtn" class="ghost" type="button">Flip camera</button>
+  <button id="shareBtn" class="success" disabled>Share</button>
+  <button id="downloadBtn" class="ghost" disabled>Download</button>
+  <button id="clearBtn" class="danger">Clear</button>
+</div>
+
+
+        <p class="hint">
+          Stamp appears at the <strong>top-right</strong> on up to <strong>three lines</strong>:
+          <br><em>Student • Teacher</em><br>
+          <em>Pukekohe High School • Subject / Project</em><br>
+          <em>Custom text (optional)</em>
+        </p>
+      </div>
+
+      <div class="panel stack">
         <div class="inline">
-          <span class="pill">Preview</span>
-          <span class="small muted">(scaled for speed; final stamp is applied to the saved image)</span>
+          <h2>Result</h2>
+          <span class="pill muted">Stamped image</span>
         </div>
-        <div class="overlay-wrap">
-          <video id="video" class="media" playsinline autoplay muted></video>
-          <div id="overlayText" class="stamp-overlay" aria-hidden="true"></div>
-        </div>
-        <canvas id="canvas" style="display:none;"></canvas>
-        <img id="preview" class="media" alt="Preview appears here after capture" style="display:none;" />
+        <img id="preview" class="media" alt="Stamped preview will appear here" />
+        <p class="hint">
+          This is the final stamped image that will be shared / downloaded.
+        </p>
       </div>
     </div>
-        
-        <div class="btn-row">
-         
-          <button id="shootBtn" class="primary" disabled>Capture & Stamp (Camera)</button>
-          <button id="shareBtn" class="success" disabled>Share</button>
-          <button id="downloadBtn" class="ghost" disabled>Download</button>
-          <button id="flipBtn" class="btn">Flip Camera</button>
-          <button id="clearBtn" class="danger">Clear</button>
-          
-      
-   
-     
 
-     
-
-    <section class="panel">
-      <h3 class="inline">Relevant teachers <span class="pill muted">quick reference</span></h3>
-      <ul id="teacherList" class="teachers"></ul>
-    </section>
-   </div>
- </div>
-
-  
-      <div class="btn-row">
-        <button value="cancel">Close</button>
+    <div class="panel stack">
+      <div class="inline">
+        <h2>Teachers &amp; subjects</h2>
+        <span class="pill muted">From selections.json</span>
       </div>
-    </form>
+      <ul id="teacherList" class="teachers"></ul>
+    </div>
+  </section>
+
+  <dialog id="tipsDialog">
+    <h3>Tips for good evidence photos</h3>
+    <ul>
+      <li>Make sure student work is clearly visible and in focus.</li>
+      <li>Include enough context so it&#x27;s obvious what&#x27;s being assessed.</li>
+      <li>Use the custom text field to add any extra notes.</li>
+    </ul>
+    <div class="btn-row" style="margin-top: 1rem;">
+      <button id="closeTipsBtn" class="primary">Close</button>
+    </div>
   </dialog>
 
-  <!-- Script -->
-  <script src="script.js"></script>
+  <script src="script.js" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').catch(console.error);
+      });
+    }
+  </script>
 </body>
 </html>

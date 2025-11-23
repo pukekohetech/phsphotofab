@@ -55,6 +55,53 @@ let deferredPrompt = null;
   logoImg.src = 'crest-192.png';
 })();
 
+
+// ---------------------------
+// Cameraflip
+// ---------------------------
+
+// Updated script.js with camera flip support
+// Add this snippet to your existing script.js
+
+let useFrontCamera = false;
+let currentStream = null;
+
+async function startCamera() {
+  if (currentStream) {
+    currentStream.getTracks().forEach(t => t.stop());
+  }
+
+  const constraints = {
+    video: {
+      facingMode: useFrontCamera ? "user" : "environment"
+    }
+  };
+
+  try {
+    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById("video");
+    video.srcObject = currentStream;
+  } catch (err) {
+    console.error("Camera error:", err);
+  }
+}
+
+// Call startCamera() when the page loads
+window.addEventListener("load", startCamera);
+
+// Flip button handler
+function flipCamera() {
+  useFrontCamera = !useFrontCamera;
+  startCamera();
+}
+
+// Add this to your HTML: <button id="flipBtn">Flip Camera</button>
+document.addEventListener("DOMContentLoaded", () => {
+  const flipBtn = document.getElementById("flipBtn");
+  if (flipBtn) flipBtn.addEventListener("click", flipCamera);
+});
+
+
 // ---------------------------
 // Helpers
 // ---------------------------

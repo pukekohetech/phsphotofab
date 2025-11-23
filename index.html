@@ -3,282 +3,155 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pukekohe HS • Camera → Stamp → Share</title>
+  <title>PHS Evidence Stamper</title>
 
-  <!-- PWA meta -->
+  <!-- PWA -->
   <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#2563eb" />
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Pukekohe HS Stamper">
+  <meta name="theme-color" content="#6e1818" />
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="icon" sizes="192x192" href="icon-192.png">
   <link rel="icon" sizes="512x512" href="icon-512.png">
 
-  <!-- Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="app">
-    <!-- HERO / HEADER -->
-    <header class="app-header">
-      <div class="hero">
-        <div class="hero-inner">
-          <div class="hero-brand">
-            <div class="hero-koru">P</div>
-            <div>
-              <h1 class="app-title">Pukekohe High School – Photo Evidence Stamper</h1>
-              <p class="app-subtitle">
-                Capture, stamp, and share assessment evidence with PHS branding and teacher details.
-              </p>
-            </div>
-          </div>
+<div id="app">
 
-          <div class="hero-actions">
-            <div class="hero-badge">
-              <span>●</span>
-              Pukekohe High School
-            </div>
-            <div class="btn-row">
-              <button id="initBtn" class="primary">
-                <span class="icon">📷</span>
-                Enable Camera
-              </button>
-              <button id="helpBtn" type="button">
-                <span class="icon">❔</span>
-                Tips
-              </button>
-              <button id="themeBtn" class="ghost" type="button" title="Toggle theme">
-                🌓 Theme
-              </button>
-              <button id="installBtn" class="ghost" type="button" style="display:none;">
-                ⬇️ Install
-              </button>
-            </div>
-          </div>
+  <!-- HEADER (small + clean) -->
+  <header class="app-header" style="margin-bottom:12px;">
+    <h1 class="app-title" style="font-size:1.3rem;margin-bottom:6px;">PHS Evidence Stamper</h1>
+
+    <div class="btn-row">
+      <button id="initBtn" class="primary">
+        📷 Enable Camera
+      </button>
+      <button id="themeBtn" class="ghost" type="button">🌓</button>
+      <button id="installBtn" class="ghost" type="button" style="display:none;">⬇️ Install</button>
+    </div>
+    <div id="toast" class="toast"></div>
+  </header>
+
+  <!-- MAIN GRID -->
+  <section class="grid">
+
+    <!-- 1) CAMERA + CAPTURE -->
+    <div class="panel stack">
+      <h2>Camera</h2>
+
+      <div class="overlay-wrap">
+        <canvas id="canvas" width="1280" height="720" style="display:none;"></canvas>
+        <video id="video" class="media" playsinline muted></video>
+
+        <div id="overlayText" class="stamp-overlay">
+          <span>
+            Student – Teacher<br>
+            Pukekohe High School • Time<br>
+            Subject / Project
+          </span>
         </div>
       </div>
-      <div id="toast" class="toast" role="status"></div>
-    </header>
 
-    <!-- MAIN GRID -->
-    <section class="grid">
-      <!-- LEFT: details form -->
+      <!-- Capture buttons directly under preview -->
+      <div class="btn-row" style="margin-top:10px;">
+        <button id="shootBtn" class="primary" disabled>📸 Capture & Stamp</button>
+        <button id="flipBtn" class="ghost">🔄 Flip</button>
+      </div>
+
+      <!-- File input directly below camera -->
+      <div class="row row--2" style="margin-top:8px;">
+        <div class="stack">
+          <label for="fileInput">Upload a photo</label>
+          <input id="fileInput" type="file" accept="image/*">
+        </div>
+        <div class="stack">
+          <label>&nbsp;</label>
+          <button id="fileStampBtn" type="button">Stamp File</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2) RESULT -->
+    <div class="panel stack">
+      <h2>Result</h2>
+      <img id="preview" class="media" alt="Stamped image appears here">
+
+      <div class="btn-row" style="margin-top:10px;">
+        <button id="shareBtn" class="ghost" disabled>📤 Share</button>
+        <button id="downloadBtn" class="ghost" disabled>⬇️ Download</button>
+        <button id="clearBtn" class="danger">Clear</button>
+      </div>
+    </div>
+
+    <!-- 3) FORM -->
+    <div class="panel stack">
+      <h2>Details</h2>
+
+      <div class="stack">
+        <label for="name">Student name</label>
+        <input id="name" list="recentStudents" placeholder="Student name">
+        <datalist id="recentStudents"></datalist>
+      </div>
+
       <div class="row row--2">
-        <div class="panel stack">
-          <div class="stack">
-            <label for="name">Student name</label>
-            <input
-              id="name"
-              list="recentStudents"
-              placeholder="e.g., Alex Smith"
-              autocomplete="name"
-            />
-            <datalist id="recentStudents"></datalist>
-          </div>
-
-          <div class="row row--2">
-            <div class="stack">
-              <label for="teacherSelect">Select teacher</label>
-              <select id="teacherSelect"></select>
-            </div>
-            <div class="stack">
-              <label for="teacherEmail">Teacher email</label>
-              <input
-                id="teacherEmail"
-                type="email"
-                placeholder="teacher@pukekohehigh.school.nz"
-              />
-            </div>
-          </div>
-
-          <div id="customTeacherGroup" class="row row--2" style="display:none;">
-            <div class="stack">
-              <label for="customTeacherName">Custom teacher name</label>
-              <input id="customTeacherName" placeholder="e.g., Ms Taylor" />
-            </div>
-            <div class="stack">
-              <label>&nbsp;</label>
-              <button id="copyEmailBtn" type="button">Copy email</button>
-            </div>
-          </div>
-
-          <div class="row row--2">
-            <div class="stack">
-              <label for="subjectSelect">Subject</label>
-              <select id="subjectSelect"></select>
-            </div>
-            <div class="stack">
-              <label for="projectSelect">Project / context</label>
-              <select id="projectSelect"></select>
-            </div>
-          </div>
-
-          <div id="customProjectGroup" class="stack" style="display:none;">
-            <label for="customProjectInput">Custom project</label>
-            <input id="customProjectInput" placeholder="e.g., 10DGT – Website layout" />
-          </div>
-
-          <div class="stack">
-            <label for="subject">Custom stamp text (optional)</label>
-            <textarea
-              id="subject"
-              rows="2"
-              placeholder="Useful for extra context or when subject / project isn’t in the list."
-            ></textarea>
-            <p class="hint">
-              This text will appear on the stamp along with the student & teacher details.
-            </p>
-          </div>
+        <div class="stack">
+          <label for="teacherSelect">Teacher</label>
+          <select id="teacherSelect"></select>
         </div>
-
-        <!-- RIGHT: live preview -->
-        <div class="panel stack">
-          <div class="inline">
-            <h2>Preview</h2>
-            <span class="pill muted">Stamp overlay</span>
-          </div>
-
-          <div class="stack">
-            <label>Live camera preview</label>
-            <div class="overlay-wrap">
-              <!-- Hidden canvas for stamping -->
-              <canvas
-                id="canvas"
-                width="1280"
-                height="720"
-                style="display:none;"
-              ></canvas>
-
-              <!-- Live camera feed -->
-              <video
-                id="video"
-                class="media"
-                playsinline
-                muted
-              ></video>
-
-              <!-- Overlay text -->
-              <div id="overlayText" class="stamp-overlay">
-                <span>
-                  Student Name – Teacher Name
-                  <br />Pukekohe High School • Subject / Project
-                  <br />Extra description about what’s happening in the photo
-                </span>
-              </div>
-            </div>
-            <p class="hint">
-              This is how the stamp will appear on the photo. It updates as you change
-              student, teacher, subject, or custom text.
-            </p>
-          </div>
+        <div class="stack">
+          <label for="teacherEmail">Email</label>
+          <input id="teacherEmail" type="email">
         </div>
       </div>
 
-      <!-- SECOND ROW: capture + result -->
+      <div id="customTeacherGroup" class="row row--2" style="display:none;">
+        <div class="stack">
+          <label for="customTeacherName">Custom teacher</label>
+          <input id="customTeacherName">
+        </div>
+        <div class="stack">
+          <label>&nbsp;</label>
+          <button id="copyEmailBtn">Copy</button>
+        </div>
+      </div>
+
       <div class="row row--2">
-        <!-- Capture controls -->
-        <div class="panel stack">
-          <div class="inline">
-            <h2>Capture</h2>
-            <span class="pill">Camera or file</span>
-          </div>
-
-          <div class="row row--2">
-            <div class="stack">
-              <label for="fileInput">Choose a photo (optional)</label>
-              <input id="fileInput" type="file" accept="image/*" />
-            </div>
-            <div class="stack">
-              <label>&nbsp;</label>
-              <button id="fileStampBtn" type="button">Choose &amp; Stamp (File)</button>
-            </div>
-          </div>
-
-          <div class="btn-row">
-            <button id="shootBtn" class="primary" type="button" disabled>
-              Capture &amp; Stamp (Camera)
-            </button>
-            <button id="flipBtn" class="ghost" type="button">
-              Flip camera
-            </button>
-            <button id="shareBtn" class="ghost" type="button" disabled>
-              Share
-            </button>
-            <button id="downloadBtn" class="ghost" type="button" disabled>
-              Download
-            </button>
-            <button id="clearBtn" class="danger" type="button">
-              Clear
-            </button>
-          </div>
-
-          <p class="hint">
-            Stamp appears at the <strong>top-right</strong> on up to
-            <strong>three lines</strong>:
-            <br /><em>Student • Teacher</em><br />
-            <em>Pukekohe High School • date/time</em><br />
-            <em>Subject/Project or custom text (optional)</em>.
-          </p>
+        <div class="stack">
+          <label for="subjectSelect">Subject</label>
+          <select id="subjectSelect"></select>
         </div>
-
-        <!-- Result image -->
-        <div class="panel stack">
-          <div class="inline">
-            <h2>Result</h2>
-            <span class="pill muted">Stamped image</span>
-          </div>
-          <img
-            id="preview"
-            class="media"
-            alt="Stamped preview will appear here"
-          />
-          <p class="hint">
-            This is the final stamped image that will be shared or downloaded.
-          </p>
+        <div class="stack">
+          <label for="projectSelect">Project</label>
+          <select id="projectSelect"></select>
         </div>
       </div>
 
-      <!-- Teachers list -->
-      <div class="panel stack">
-        <div class="inline">
-          <h2>Teachers &amp; subjects</h2>
-          <span class="pill muted">From selections.json</span>
-        </div>
-        <ul id="teacherList" class="teachers"></ul>
+      <div id="customProjectGroup" class="stack" style="display:none;">
+        <label for="customProjectInput">Custom project</label>
+        <input id="customProjectInput">
       </div>
-    </section>
 
-    <!-- Tips dialog -->
-    <dialog id="tipsDialog">
-      <form method="dialog" class="stack" style="min-width: min(92vw, 640px);">
-        <h3>Tips</h3>
-        <ul class="stack small">
-          <li>Best on mobile Safari/Chrome (Share Sheet attaches files there).</li>
-          <li>Make sure student work is clearly visible and in focus.</li>
-          <li>Use the custom text field to add any extra notes for moderation.</li>
-          <li>We remember your last student/teacher and keep a short student history.</li>
-          <li>
-            Keyboard: <strong>Enter</strong> = Capture &amp; Stamp,
-            <strong>Ctrl+S</strong> = Share (or Download).
-          </li>
-        </ul>
-        <div class="btn-row" style="margin-top: 1rem;">
-          <button value="cancel" class="primary">Close</button>
-        </div>
-      </form>
-    </dialog>
-  </div>
+      <div class="stack">
+        <label for="subject">Custom text</label>
+        <textarea id="subject" rows="2"></textarea>
+      </div>
+    </div>
 
-  <!-- Script -->
-  <script src="script.js"></script>
-  <script>
-    // Service worker for offline use
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js').catch(console.error);
-      });
-    }
-  </script>
+    <!-- TEACHER LIST (kept for debugging / admin) -->
+    <div class="panel stack">
+      <h2>Teachers</h2>
+      <ul id="teacherList" class="teachers"></ul>
+    </div>
+
+  </section>
+</div>
+
+<script src="script.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js');
+    });
+  }
+</script>
 </body>
 </html>

@@ -1,579 +1,748 @@
 // ---------------------------
-// Global selections (from selections.json)
+// Element references
 // ---------------------------
-let selections = { teachers: [], subjects: [], projects: [] };
+const html = document.documentElement;
 
-// UI refs
-const initBtn = document.getElementById('initBtn');
-const helpBtn = document.getElementById('helpBtn');
-const themeBtn = document.getElementById('themeBtn');
-const installBtn = document.getElementById('installBtn');
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const preview = document.getElementById('preview');
-const shootBtn = document.getElementById('shootBtn');
-const shareBtn = document.getElementById('shareBtn');
-const downloadBtn = document.getElementById('downloadBtn');
-const clearBtn = document.getElementById('clearBtn');
 const nameInput = document.getElementById('name');
-const subjectInput = document.getElementById('subject'); // hidden combined subject text
+const recentStudentsDatalist = document.getElementById('recentStudents');
+
+const teacherSelect = document.getElementById('teacherSelect');
+const teacherEmailInput = document.getElementById('teacherEmail');
+const customTeacherGroup = document.getElementById('customTeacherGroup');
+const customTeacherNameInput = document.getElementById('customTeacherName');
+const copyEmailBtn = document.getElementById('copyEmailBtn');
+
 const subjectSelect = document.getElementById('subjectSelect');
 const projectSelect = document.getElementById('projectSelect');
 const customProjectGroup = document.getElementById('customProjectGroup');
 const customProjectInput = document.getElementById('customProjectInput');
-const teacherSelect = document.getElementById('teacherSelect');
-const teacherEmail = document.getElementById('teacherEmail');
-const copyEmailBtn = document.getElementById('copyEmailBtn');
-const teacherList = document.getElementById('teacherList');
+
+const customTextInput = document.getElementById('subject'); // custom stamp text
+const overlayTextEl = document.getElementById('overlayText');
+
+const canvas = document.getElementById('canvas');
+const video = document.getElementById('video');
+const previewImg = document.getElementById('preview');
+
 const fileInput = document.getElementById('fileInput');
 const fileStampBtn = document.getElementById('fileStampBtn');
-const toast = document.getElementById('toast');
-const overlayText = document.getElementById('overlayText');
-const customTeacherGroup = document.getElementById('customTeacherGroup');
-const customTeacherName = document.getElementById('customTeacherName');
+const shootBtn = document.getElementById('shootBtn');
+const flipBtn = document.getElementById('flipBtn');
+const shareBtn = document.getElementById('shareBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const clearBtn = document.getElementById('clearBtn');
+
+const initBtn = document.getElementById('initBtn');
+const helpBtn = document.getElementById('helpBtn');
+const themeBtn = document.getElementById('themeBtn');
+const installBtn = document.getElementById('installBtn');
+
+const toastEl = document.getElementById('toast');
 const tipsDialog = document.getElementById('tipsDialog');
-const recentStudentsDL = document.getElementById('recentStudents');
+const teacherListEl = document.getElementById('teacherList');
 
+// ---------------------------
 // State
+// ---------------------------
+const THEME_KEY = 'phs-photo-theme';
+const STUDENTS_KEY = 'phs-photo-recent-students';
+const STATE_KEY = 'phs-photo-last-state';
+
+let selections = {
+  teachers: [],
+  subjects: [],
+  projects: []
+};
+
 let stream = null;
-let stampedFile = null;
+let videoDevices = [];
+let currentDeviceIndex = 0;
+let currentFacingMode = 'environment';
+
+let lastBlob = null;
 let lastMeta = null;
-let logoImg = new Image();
-let logoReady = false;
+let lastObjectUrl = null;
+
 let deferredPrompt = null;
-
-// ---------------------------
-// Crest preload
-// ---------------------------
-(function preloadLogo() {
-  logoImg.onload = function () { logoReady = true; };
-  logoImg.onerror = function () {
-    logoReady = false;
-    console.warn('Logo failed to load (crest-192.png)');
-  };
-  // crest-192.png must sit next to index.html
-  logoImg.src = 'crest-192.png';
-})();
-
-
-// ---------------------------
-// Cameraflip
-// ---------------------------
-
-// Updated script.js with camera flip support
-// Add this snippet to your existing script.js
-
-let useFrontCamera = false;
-let currentStream = null;
-
-async function startCamera() {
-  if (currentStream) {
-    currentStream.getTracks().forEach(t => t.stop());
-  }
-
-  const constraints = {
-    video: {
-      facingMode: useFrontCamera ? "user" : "environment"
-    }
-  };
-
-  try {
-    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-    const video = document.getElementById("video");
-    video.srcObject = currentStream;
-  } catch (err) {
-    console.error("Camera error:", err);
-  }
-}
-
-// Call startCamera() when the page loads
-window.addEventListener("load", startCamera);
-
-// Flip button handler
-function flipCamera() {
-  useFrontCamera = !useFrontCamera;
-  startCamera();
-}
-
-// Add this to your HTML: <button id="flipBtn">Flip Camera</button>
-document.addEventListener("DOMContentLoaded", () => {
-  const flipBtn = document.getElementById("flipBtn");
-  if (flipBtn) flipBtn.addEventListener("click", flipCamera);
-});
-
+let recentStudents = [];
 
 // ---------------------------
 // Helpers
 // ---------------------------
-function showToast(text, ok) {
-  if (typeof ok === 'undefined') ok = true;
-  toast.textContent = text;
+function showToast(message, ok = true, duration = 2400) {
+  if (!toastEl) return;
+  toastEl.textContent = message;
+  toastEl.classList.add('show');
   if (!ok) {
-    toast.classList.add('error');
+    toastEl.style.background = 'rgba(185, 28, 28, 0.98)';
   } else {
-    toast.classList.remove('error');
+    toastEl.style.background = 'rgba(15, 23, 42, 0.95)';
   }
-  toast.style.display = 'block';
-  setTimeout(function () { toast.style.display = 'none'; }, 4500);
+
+  setTimeout(() => {
+    toastEl.classList.remove('show');
+  }, duration);
 }
 
 function getTheme() {
-  return localStorage.getItem('phs_theme') || 'auto';
+  return localStorage.getItem(THEME_KEY) || 'auto';
 }
 
-function setTheme(mode) {
-  document.documentElement.setAttribute('data-theme', mode);
-  try {
-    localStorage.setItem('phs_theme', mode);
-  } catch (e) {}
+function setTheme(theme) {
+  html.dataset.theme = theme;
+  localStorage.setItem(THEME_KEY, theme);
 }
 
 function toggleTheme() {
-  var current = getTheme();
-  var next = current === 'dark' ? 'light' : (current === 'light' ? 'auto' : 'dark');
+  const current = getTheme();
+  const next = current === 'light' ? 'dark' : current === 'dark' ? 'auto' : 'light';
   setTheme(next);
-  showToast('Theme: ' + next);
+  showToast(`Theme: ${next}`);
 }
 
-function persist() {
-  var data = {
-    student: nameInput.value || '',
-    teacherId: teacherSelect.value || '',
-    teacherEmail: teacherEmail.value || '',
-    customTeacherName: customTeacherName.value || '',
-    subjectId: subjectSelect.value || '',
-    projectId: projectSelect.value || '',
-    customProjectText: customProjectInput.value || ''
-  };
-  try {
-    localStorage.setItem('printme_pref', JSON.stringify(data));
-  } catch (e) {}
-}
-
-function restore() {
-  try {
-    var data = JSON.parse(localStorage.getItem('printme_pref') || '{}');
-    if (data.student) nameInput.value = data.student;
-    if (data.customTeacherName) customTeacherName.value = data.customTeacherName;
-    if (data.teacherId) teacherSelect.value = data.teacherId;
-    if (data.teacherEmail) teacherEmail.value = data.teacherEmail;
-
-    // apply teacher filter to subjects
-    handleTeacherSelectChange(false); // false = don't persist during restore
-
-    if (data.subjectId) {
-      subjectSelect.value = data.subjectId;
-      populateProjects(data.subjectId);
-    }
-
-    if (data.projectId) {
-      projectSelect.value = data.projectId;
-    }
-
-    if (data.customProjectText) {
-      customProjectInput.value = data.customProjectText;
-      customProjectGroup.style.display = '';
-    }
-
-    updateSubjectTextFromSelections();
-  } catch (e) {}
-}
-
+// ---------------------------
+// Persistence: recent students + last state
+// ---------------------------
 function loadRecentStudents() {
   try {
-    var arr = JSON.parse(localStorage.getItem('recent_students') || '[]');
-    recentStudentsDL.innerHTML = arr.map(function (s) {
-      return '<option value="' + s + '"></option>';
-    }).join('');
-  } catch (e) {
-    recentStudentsDL.innerHTML = '';
-  }
-}
-
-function pushRecentStudent(name) {
-  var s = (name || '').trim();
-  if (!s) return;
-  try {
-    var arr = JSON.parse(localStorage.getItem('recent_students') || '[]');
-    var next = [s].concat(arr.filter(function (x) {
-      return x.toLowerCase() !== s.toLowerCase();
-    })).slice(0, 10);
-    localStorage.setItem('recent_students', JSON.stringify(next));
-    loadRecentStudents();
-  } catch (e) {}
-}
-
-// ---------------------------
-// JSON-driven selections
-// ---------------------------
-function populateTeachersFromSelections(filterSubjectId) {
-  var previousId = teacherSelect.value;
-
-  var teachers = selections.teachers;
-  if (filterSubjectId) {
-    teachers = selections.teachers.filter(function (t) {
-      return (t.subjects || []).indexOf(filterSubjectId) !== -1;
-    });
-  }
-
-  var options = teachers.map(function (t) {
-    return '<option value="' + t.id + '">' + t.name + '</option>';
-  });
-  options.push('<option value="custom">Custom…</option>');
-  teacherSelect.innerHTML = options.join('');
-
-  var newId = previousId;
-  if (!teachers.some(function (t) { return t.id === previousId; })) {
-    if (teachers[0]) newId = teachers[0].id;
-    else newId = 'custom';
-  }
-  teacherSelect.value = newId;
-
-  if (newId !== 'custom') {
-    var t = selections.teachers.find(function (x) { return x.id === newId; });
-    teacherEmail.value = (t && t.email) ? t.email : '';
-  } else {
-    teacherEmail.value = '';
-  }
-
-  teacherList.innerHTML = selections.teachers
-    .map(function (t) {
-      return '<li><span>' + t.name + '</span><span><code>' + t.email + '</code></span></li>';
-    })
-    .join('');
-}
-
-function populateSubjects(filterTeacherId) {
-  var previousId = subjectSelect.value;
-
-  var availableSubjects = selections.subjects;
-  if (filterTeacherId && filterTeacherId !== 'custom') {
-    var teacher = selections.teachers.find(function (t) { return t.id === filterTeacherId; });
-    if (teacher) {
-      availableSubjects = selections.subjects.filter(function (s) {
-        return (teacher.subjects || []).indexOf(s.id) !== -1;
-      });
+    const raw = localStorage.getItem(STUDENTS_KEY);
+    if (raw) {
+      recentStudents = JSON.parse(raw);
+    } else {
+      recentStudents = [];
     }
+  } catch {
+    recentStudents = [];
+  }
+  renderRecentStudents();
+}
+
+function saveRecentStudents() {
+  try {
+    localStorage.setItem(STUDENTS_KEY, JSON.stringify(recentStudents.slice(0, 20)));
+  } catch (e) {
+    console.warn('Could not save recent students', e);
+  }
+}
+
+function addRecentStudent(name) {
+  if (!name) return;
+  const existingIndex = recentStudents.indexOf(name);
+  if (existingIndex >= 0) {
+    recentStudents.splice(existingIndex, 1);
+  }
+  recentStudents.unshift(name);
+  saveRecentStudents();
+  renderRecentStudents();
+}
+
+function renderRecentStudents() {
+  if (!recentStudentsDatalist) return;
+  recentStudentsDatalist.innerHTML = '';
+  recentStudents.forEach((n) => {
+    const option = document.createElement('option');
+    option.value = n;
+    recentStudentsDatalist.appendChild(option);
+  });
+}
+
+function saveState() {
+  const state = {
+    name: nameInput?.value || '',
+    teacherId: teacherSelect?.value || '',
+    teacherEmail: teacherEmailInput?.value || '',
+    customTeacherName: customTeacherNameInput?.value || '',
+    subjectId: subjectSelect?.value || '',
+    projectId: projectSelect?.value || '',
+    customProject: customProjectInput?.value || '',
+    customText: customTextInput?.value || ''
+  };
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.warn('Could not save state', e);
+  }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (!raw) return;
+    const state = JSON.parse(raw);
+    if (nameInput && state.name) nameInput.value = state.name;
+    if (teacherEmailInput && state.teacherEmail) teacherEmailInput.value = state.teacherEmail;
+    if (customTeacherNameInput && state.customTeacherName) customTeacherNameInput.value = state.customTeacherName;
+    if (customProjectInput && state.customProject) customProjectInput.value = state.customProject;
+    if (customTextInput && state.customText) customTextInput.value = state.customText;
+
+    // selects applied after selections are loaded
+    return state;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------
+// Selections (teachers / subjects / projects)
+// ---------------------------
+async function loadSelections() {
+  try {
+    const res = await fetch('selections.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to load selections');
+    selections = await res.json();
+  } catch (e) {
+    console.error(e);
+    showToast('Could not load teachers/subjects.', false);
+    selections = { teachers: [], subjects: [], projects: [] };
   }
 
-  var options = ['<option value="">Select subject…</option>'].concat(
-    availableSubjects.map(function (s) {
-      return '<option value="' + s.id + '">' + s.label + '</option>';
-    })
-  );
-  subjectSelect.innerHTML = options.join('');
-
-  var newId = '';
-  if (availableSubjects.some(function (s) { return s.id === previousId; })) {
-    newId = previousId;
+  populateTeachers();
+  populateSubjects();
+  const lastState = loadState();
+  if (lastState) {
+    if (subjectSelect && lastState.subjectId) {
+      subjectSelect.value = lastState.subjectId;
+      populateProjects(lastState.subjectId);
+    } else {
+      populateProjects(subjectSelect?.value || '');
+    }
+    if (projectSelect && lastState.projectId) {
+      projectSelect.value = lastState.projectId;
+    }
+    if (teacherSelect && lastState.teacherId) {
+      teacherSelect.value = lastState.teacherId;
+      updateTeacherFromSelect();
+    }
+  } else {
+    populateProjects(subjectSelect?.value || '');
   }
-  subjectSelect.value = newId;
+
+  renderTeacherList();
+  updateOverlay();
+}
+
+function populateTeachers() {
+  if (!teacherSelect) return;
+  teacherSelect.innerHTML = '';
+
+  // Normal teachers
+  selections.teachers.forEach((t) => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    teacherSelect.appendChild(opt);
+  });
+
+  // Divider-ish
+  const optDivider = document.createElement('option');
+  optDivider.disabled = true;
+  optDivider.textContent = '──────────';
+  teacherSelect.appendChild(optDivider);
+
+  // Custom teacher option
+  const optCustom = document.createElement('option');
+  optCustom.value = '__custom';
+  optCustom.textContent = 'Other teacher (custom)';
+  teacherSelect.appendChild(optCustom);
+
+  teacherSelect.value = selections.teachers[0]?.id || '';
+}
+
+function populateSubjects() {
+  if (!subjectSelect) return;
+  subjectSelect.innerHTML = '';
+
+  selections.subjects.forEach((s) => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.label;
+    subjectSelect.appendChild(opt);
+  });
+
+  const optDivider = document.createElement('option');
+  optDivider.disabled = true;
+  optDivider.textContent = '──────────';
+  subjectSelect.appendChild(optDivider);
+
+  const optCustom = document.createElement('option');
+  optCustom.value = '__custom';
+  optCustom.textContent = 'Other subject / context';
+  subjectSelect.appendChild(optCustom);
+
+  subjectSelect.value = selections.subjects[0]?.id || '';
 }
 
 function populateProjects(subjectId) {
-  var projects = selections.projects.filter(function (p) { return p.subjectId === subjectId; });
-  var options = ['<option value="">Select project…</option>'].concat(
-    projects.map(function (p) {
-      return '<option value="' + p.id + '">' + p.label + '</option>';
-    })
-  );
-  projectSelect.innerHTML = options.join('');
-  projectSelect.disabled = projects.length === 0;
-  if (projects.length === 0) projectSelect.value = '';
-  customProjectGroup.style.display = 'none';
-  customProjectInput.value = '';
+  if (!projectSelect) return;
+  projectSelect.innerHTML = '';
+
+  const isCustomSubject = subjectId === '__custom';
+
+  if (!isCustomSubject) {
+    const list = selections.projects.filter((p) => p.subjectId === subjectId);
+    list.forEach((p) => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.label;
+      projectSelect.appendChild(opt);
+    });
+  }
+
+  const optDivider = document.createElement('option');
+  optDivider.disabled = true;
+  optDivider.textContent = '──────────';
+  projectSelect.appendChild(optDivider);
+
+  const optCustom = document.createElement('option');
+  optCustom.value = '__custom';
+  optCustom.textContent = 'Other project / task';
+  projectSelect.appendChild(optCustom);
+
+  // default selection
+  if (projectSelect.options.length > 0) {
+    const firstValid = Array.from(projectSelect.options).find((o) => !o.disabled);
+    if (firstValid) projectSelect.value = firstValid.value;
+  }
+
+  // custom project group visible if subject or project is custom
+  if (customProjectGroup) {
+    customProjectGroup.style.display =
+      subjectId === '__custom' || projectSelect.value === '__custom' ? '' : 'none';
+  }
+}
+
+function renderTeacherList() {
+  if (!teacherListEl) return;
+  teacherListEl.innerHTML = '';
+
+  selections.teachers.forEach((t) => {
+    const li = document.createElement('li');
+
+    const nameEl = document.createElement('strong');
+    nameEl.textContent = t.name;
+    li.appendChild(nameEl);
+
+    const emailEl = document.createElement('div');
+    emailEl.className = 'small';
+    emailEl.textContent = t.email;
+    li.appendChild(emailEl);
+
+    if (t.subjects && t.subjects.length) {
+      const subEl = document.createElement('div');
+      subEl.className = 'small';
+      const labels = t.subjects
+        .map((id) => selections.subjects.find((s) => s.id === id)?.label || id)
+        .join(', ');
+      subEl.textContent = labels;
+      li.appendChild(subEl);
+    }
+
+    teacherListEl.appendChild(li);
+  });
+}
+
+function updateTeacherFromSelect() {
+  if (!teacherSelect || !teacherEmailInput || !customTeacherGroup) return;
+  const value = teacherSelect.value;
+  if (value === '__custom') {
+    customTeacherGroup.style.display = '';
+    teacherEmailInput.value = '';
+  } else {
+    customTeacherGroup.style.display = 'none';
+    const t = selections.teachers.find((x) => x.id === value);
+    teacherEmailInput.value = t?.email || '';
+    if (customTeacherNameInput) customTeacherNameInput.value = '';
+  }
 }
 
 // ---------------------------
-// Stamp text helpers
+// Stamp text & overlay
 // ---------------------------
-function formatTimestamp() {
-  var now = new Date();
-  var pad = function (n) {
-    return String(n).padStart(2, '0');
+function getNowStampDisplay() {
+  const now = new Date();
+  const opts = {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
   };
-  var YYYY = now.getFullYear();
-  var MM = pad(now.getMonth() + 1);
-  var DD = pad(now.getDate());
-  var hh = pad(now.getHours());
-  var mm = pad(now.getMinutes());
-  return {
-    display: now.toLocaleString([], {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }),
-    compact: YYYY + MM + DD + '_' + hh + mm
-  };
+  return now.toLocaleString(undefined, opts);
 }
 
 function getSelectedTeacherName() {
-  var val = teacherSelect.value;
-  if (val === 'custom') {
-    return (customTeacherName.value || '').trim();
+  if (!teacherSelect) return '';
+  if (teacherSelect.value === '__custom') {
+    return customTeacherNameInput?.value || (teacherEmailInput?.value || '').split('@')[0] || 'Teacher';
   }
-  var t = selections.teachers.find(function (x) { return x.id === val; });
-  return t ? t.name : '';
+  const t = selections.teachers.find((x) => x.id === teacherSelect.value);
+  return t?.name || 'Teacher';
 }
 
 function getSelectedSubjectLabel() {
-  var subjId = subjectSelect.value;
-  var s = selections.subjects.find(function (x) { return x.id === subjId; });
-  return s ? s.label : '';
+  if (!subjectSelect) return '';
+  if (subjectSelect.value === '__custom') {
+    return customProjectInput?.value || 'Custom context';
+  }
+  const s = selections.subjects.find((x) => x.id === subjectSelect.value);
+  return s?.label || '';
 }
 
-function getSelectedProjectMeta() {
-  var projId = projectSelect.value;
-  return selections.projects.find(function (p) { return p.id === projId; }) || null;
+function getSelectedProjectLabel() {
+  if (!projectSelect) return '';
+  if (projectSelect.value === '__custom') {
+    return customProjectInput?.value || 'Custom project';
+  }
+  const p = selections.projects.find((x) => x.id === projectSelect.value);
+  return p?.label || '';
 }
 
-function buildStampText() {
-  var studentName = (nameInput.value || '').trim();
-  var teacherName = getSelectedTeacherName();
-  var subj = (subjectInput.value || '').trim();
-  var tsObj = formatTimestamp();
+function buildStampLines() {
+  const studentName = (nameInput?.value || '').trim() || 'Student Name';
+  const teacherName = getSelectedTeacherName();
+  const line1 = `${studentName} – ${teacherName}`;
 
-  var line1 = [studentName, teacherName].filter(Boolean).join(' • ');
-  var line2 = ['Pukekohe High School', tsObj.display].join(' • ');
-  var line3 = subj ? subj : null;
+  const timeDisplay = getNowStampDisplay();
+  const line2 = `Pukekohe High School • ${timeDisplay}`;
 
-  var lines = [line1, line2, line3].filter(Boolean);
-  return {
-    lines: lines,
-    studentName: studentName,
-    teacherName: teacherName,
-    subject: subj,
-    tsDisplay: tsObj.display,
-    tsCompact: tsObj.compact
-  };
+  const custom = (customTextInput?.value || '').trim();
+  let line3 = custom;
+  if (!line3) {
+    const subj = getSelectedSubjectLabel();
+    const proj = getSelectedProjectLabel();
+    if (subj && proj) {
+      line3 = `${subj} • ${proj}`;
+    } else if (subj || proj) {
+      line3 = subj || proj;
+    } else {
+      line3 = 'Learning evidence';
+    }
+  }
+
+  return [line1, line2, line3];
 }
 
 function updateOverlay() {
-  var result = buildStampText();
-  overlayText.textContent = result.lines.join('\n');
-}
-
-function roundRect(ctx, x, y, w, h, r) {
-  var rr = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
-}
-
-function drawStampMultiline(ctx, lines, w, h) {
-  var margin = Math.max(12, Math.round(w * 0.012));
-  var fontSize = Math.max(20, Math.round(w * 0.03));
-  var lineH = Math.round(fontSize * 1.25);
-  var padX = Math.round(fontSize * 0.6);
-  var padY = Math.round(fontSize * 0.5);
-
-  ctx.font = '600 ' + fontSize + 'px system-ui, -apple-system, Segoe UI, Roboto, Arial';
-  ctx.textBaseline = 'top';
-
-  var maxWidth = 0;
-  lines.forEach(function (ln) {
-    var width = ctx.measureText(ln).width;
-    if (width > maxWidth) maxWidth = width;
-  });
-
-  var boxW = Math.ceil(maxWidth + padX * 2);
-  var boxH = Math.ceil(lines.length * lineH + padY * 2);
-  var x = w - margin - boxW;
-  var y = margin;
-
-  // Top-right text box
-  ctx.save();
-  roundRect(ctx, x, y, boxW, boxH, Math.round(fontSize * 0.5));
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'right';
-
-  var tx = x + boxW - padX;
-  var ty = y + padY;
-  lines.forEach(function (ln) {
-    ctx.fillText(ln, tx, ty);
-    ty += lineH;
-  });
-  ctx.restore();
-
-  // Crest top-left
-  if (logoReady) {
-    var targetW = Math.max(48, Math.round(w * 0.12));
-    var scale = targetW / logoImg.naturalWidth;
-    var targetH = Math.round(logoImg.naturalHeight * scale);
-    var gap = Math.round(w * 0.02);
-
-    var lx = gap;
-    var ly = gap;
-
-    ctx.save();
-    ctx.drawImage(logoImg, lx, ly, targetW, targetH);
-    ctx.restore();
-  }
-}
-
-function sanitizeName(str) {
-  return (str || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-}
-
-function buildFilename(meta) {
-  var s = sanitizeName(meta.studentName) || 'Unknown';
-  var t = sanitizeName(meta.teacherName) || 'Unknown';
-  return 'PHS_' + s + '_' + t + '_' + meta.tsCompact + '.jpg';
-}
-
-function updateSubjectTextFromSelections() {
-  var subjLabel = getSelectedSubjectLabel();
-  var projMeta = getSelectedProjectMeta();
-  var projectLabel = projMeta ? projMeta.label : '';
-
-  if (projMeta && projMeta.allowCustomName && customProjectInput.value.trim()) {
-    projectLabel = customProjectInput.value.trim();
-  }
-
-  subjectInput.value = [subjLabel, projectLabel].filter(Boolean).join(' — ');
-  updateOverlay();
-  persist();
+  if (!overlayTextEl) return;
+  const [line1, line2, line3] = buildStampLines();
+  overlayTextEl.innerHTML = `<span>${line1}<br>${line2}<br>${line3}</span>`;
+  saveState();
 }
 
 // ---------------------------
-// Stamping flow
+// Camera handling (with enumerateDevices)
 // ---------------------------
-function stampFromImage(img) {
-  var maxW = 800;
-  var scale = Math.min(1, maxW / img.naturalWidth);
-  var w = Math.round(img.naturalWidth * scale);
-  var h = Math.round(img.naturalHeight * scale);
-
-  canvas.width = w;
-  canvas.height = h;
-  var ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0, w, h);
-
-  var stamp = buildStampText();
-  drawStampMultiline(ctx, stamp.lines, w, h);
-
-  preview.src = canvas.toDataURL('image/jpeg', 0.85);
-  preview.style.display = 'block';
-  video.style.display = 'none';
-
-  return new Promise(function (res) {
-    canvas.toBlob(res, 'image/jpeg', 0.85);
-  }).then(function (blob) {
-    var fname = buildFilename(stamp);
-    stampedFile = new File([blob], fname, { type: 'image/jpeg' });
-
-    lastMeta = {
-      studentName: stamp.studentName || 'Unknown',
-      teacherName: stamp.teacherName || 'Unknown',
-      teacherEmail: teacherEmail.value || '',
-      subject: stamp.subject || '',
-      ts: stamp.tsDisplay,
-      filename: fname
-    };
-
-    shareBtn.disabled = false;
-    downloadBtn.disabled = false;
-    pushRecentStudent(stamp.studentName);
-    showToast('Photo ready. Tap Share or Download.');
-  });
-}
-
-async function initCamera() {
+async function ensureVideoDevices() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
   try {
-    var constraints = { audio: false, video: { facingMode: { ideal: 'environment' } } };
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    videoDevices = devices.filter((d) => d.kind === 'videoinput');
+
+    if (videoDevices.length > 1 && currentDeviceIndex === 0) {
+      const backIndex = videoDevices.findIndex((d) =>
+        /back|rear|environment/i.test(d.label)
+      );
+      if (backIndex >= 0) {
+        currentDeviceIndex = backIndex;
+        currentFacingMode = 'environment';
+      }
+    }
+  } catch (e) {
+    console.warn('enumerateDevices failed:', e);
+  }
+}
+
+async function initCamera(facingMode) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast('Camera not supported in this browser.', false);
+    return;
+  }
+
+  if (typeof facingMode === 'string') {
+    currentFacingMode = facingMode;
+  } else {
+    currentFacingMode = currentFacingMode || 'environment';
+  }
+
+  stopCamera();
+
+  if (!videoDevices.length && navigator.mediaDevices.enumerateDevices) {
+    await ensureVideoDevices();
+  }
+
+  let constraints = {
+    audio: false,
+    video: {}
+  };
+
+  if (videoDevices.length) {
+    const device = videoDevices[currentDeviceIndex] || videoDevices[0];
+    constraints.video.deviceId = { exact: device.deviceId };
+  } else {
+    constraints.video.facingMode = { ideal: currentFacingMode };
+  }
+
+  try {
     stream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = stream;
-    shootBtn.disabled = false;
-    initBtn.disabled = true;
-    showToast('Camera enabled.');
+  } catch (err) {
+    console.warn('getUserMedia failed with deviceId/facingMode, falling back:', err);
+    constraints = { audio: false, video: true };
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+  }
+
+  try {
+    if (video) {
+      video.srcObject = stream;
+      await video.play();
+    }
+    if (shootBtn) shootBtn.disabled = false;
+
+    if (videoDevices.length > 1) {
+      const label = videoDevices[currentDeviceIndex].label || `Camera ${currentDeviceIndex + 1}`;
+      showToast(label);
+    } else {
+      showToast(currentFacingMode === 'user' ? 'Front camera enabled.' : 'Back camera enabled.');
+    }
+
+    if (!videoDevices.length && navigator.mediaDevices.enumerateDevices) {
+      await ensureVideoDevices();
+    }
   } catch (err) {
     console.error(err);
-    showToast('Could not access camera. Allow permission in browser settings.', false);
+    showToast('Could not start video stream.', false);
   }
 }
 
-async function captureAndStamp() {
-  if (!stream) {
-    await initCamera();
-    if (!stream) return;
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach((t) => t.stop());
+    stream = null;
   }
-  if (!nameInput.value.trim() || !teacherSelect.value) {
-    showToast('Enter student name and select teacher.', false);
-    return;
+  if (video) {
+    video.srcObject = null;
   }
-  var vw = video.videoWidth;
-  var vh = video.videoHeight;
-  if (!vw || !vh) {
-    showToast('Camera not ready. Try again.', false);
-    return;
-  }
-
-  var off = document.createElement('canvas');
-  off.width = vw;
-  off.height = vh;
-  off.getContext('2d').drawImage(video, 0, 0);
-
-  var img = new Image();
-  img.onload = function () { stampFromImage(img); };
-  img.src = off.toDataURL('image/jpeg', 0.9);
+  if (shootBtn) shootBtn.disabled = true;
 }
 
-async function chooseFileAndStamp() {
-  if (!nameInput.value.trim() || !teacherSelect.value) {
-    showToast('Enter student name and select teacher.', false);
-    return;
-  }
-  var f = fileInput.files && fileInput.files[0];
-  if (!f) {
-    showToast('Choose a photo first.', false);
+async function flipCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast('Camera flip not supported on this device.', false);
     return;
   }
 
-  var url = URL.createObjectURL(f);
-  var img = new Image();
-  img.onload = function () {
-    URL.revokeObjectURL(url);
-    stampFromImage(img);
+  if (!videoDevices.length && navigator.mediaDevices.enumerateDevices) {
+    await ensureVideoDevices();
+  }
+
+  if (!videoDevices.length || videoDevices.length === 1) {
+    currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    await initCamera(currentFacingMode);
+    return;
+  }
+
+  currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
+  await initCamera();
+}
+
+// ---------------------------
+// Stamping
+// ---------------------------
+function drawStampOnCanvas(width, height, imageDrawer) {
+  if (!canvas) return;
+
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.save();
+  imageDrawer(ctx);
+  ctx.restore();
+
+  const padding = Math.round(width * 0.02);
+  const lineHeight = Math.round(height * 0.03);
+  const boxHeight = lineHeight * 4;
+
+  const x = padding;
+  const y = height - boxHeight - padding;
+  const boxWidth = Math.round(width * 0.8);
+
+  ctx.save();
+  const gradient = ctx.createLinearGradient(x, y + boxHeight, x, y);
+  gradient.addColorStop(0, 'rgba(15,23,42,0.95)');
+  gradient.addColorStop(0.7, 'rgba(15,23,42,0.7)');
+  gradient.addColorStop(1, 'rgba(15,23,42,0.0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(x, y, boxWidth, boxHeight);
+  ctx.restore();
+
+  // Crest
+  const crestImg = new Image();
+  crestImg.src = 'crest-192.png';
+
+  const [line1, line2, line3] = buildStampLines();
+
+  crestImg.onload = () => {
+    const crestSize = boxHeight - padding * 2;
+    ctx.drawImage(crestImg, x + padding, y + padding, crestSize, crestSize);
+
+    ctx.fillStyle = '#f9fafb';
+    ctx.font = `${Math.round(lineHeight * 0.9)}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'right';
+
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 4;
+
+    const textRight = x + boxWidth - padding;
+    let textY = y + padding + 2;
+
+    ctx.fillText(line1, textRight, textY);
+    textY += lineHeight + 2;
+    ctx.fillText(line2, textRight, textY);
+    textY += lineHeight + 2;
+    ctx.fillText(line3, textRight, textY);
+
+    ctx.shadowBlur = 0;
+    updatePreviewFromCanvas();
   };
+
+  crestImg.onerror = () => {
+    const [line1, line2, line3] = buildStampLines();
+
+    ctx.fillStyle = '#111827';
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(x, y, boxWidth, boxHeight);
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = '#f9fafb';
+    ctx.font = `${Math.round(lineHeight * 0.9)}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'right';
+
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 4;
+
+    const textRight = x + boxWidth - padding;
+    let textY = y + padding + 2;
+
+    ctx.fillText(line1, textRight, textY);
+    textY += lineHeight + 2;
+    ctx.fillText(line2, textRight, textY);
+    textY += lineHeight + 2;
+    ctx.fillText(line3, textRight, textY);
+
+    ctx.shadowBlur = 0;
+    updatePreviewFromCanvas();
+  };
+}
+
+function updatePreviewFromCanvas() {
+  if (!canvas || !previewImg) return;
+  if (lastObjectUrl) {
+    URL.revokeObjectURL(lastObjectUrl);
+    lastObjectUrl = null;
+  }
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      showToast('Could not create image blob.', false);
+      return;
+    }
+    lastBlob = blob;
+
+    const now = new Date();
+    const studentName = (nameInput?.value || 'student').trim().replace(/\s+/g, '_');
+    const filename = `PHS_${studentName || 'student'}_${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}_${now.getHours()}-${now.getMinutes()}.png`;
+
+    lastMeta = { filename, type: blob.type };
+    lastObjectUrl = URL.createObjectURL(blob);
+    previewImg.src = lastObjectUrl;
+
+    if (shareBtn) shareBtn.disabled = false;
+    if (downloadBtn) downloadBtn.disabled = false;
+
+    const student = (nameInput?.value || '').trim();
+    if (student) addRecentStudent(student);
+  }, 'image/png');
+}
+
+async function stampFromVideo() {
+  if (!video || !video.videoWidth || !video.videoHeight) {
+    showToast('Camera not ready yet.', false);
+    return;
+  }
+
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+
+  drawStampOnCanvas(w, h, (ctx) => {
+    ctx.drawImage(video, 0, 0, w, h);
+  });
+}
+
+function stampFromImageFile(file) {
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    const maxDim = 1920;
+    let { width, height } = img;
+    if (width > height && width > maxDim) {
+      const scale = maxDim / width;
+      width = maxDim;
+      height = Math.round(height * scale);
+    } else if (height > maxDim) {
+      const scale = maxDim / height;
+      height = maxDim;
+      width = Math.round(width * scale);
+    }
+
+    drawStampOnCanvas(width, height, (ctx) => {
+      ctx.drawImage(img, 0, 0, width, height);
+    });
+  };
+  img.onerror = () => {
+    showToast('Could not load image file.', false);
+  };
+
+  const url = URL.createObjectURL(file);
   img.src = url;
 }
 
-async function sharePhoto() {
-  if (!stampedFile) {
-    showToast('No image to share. Capture or choose first.', false);
+// ---------------------------
+// Share & Download
+// ---------------------------
+async function shareImage() {
+  if (!lastBlob || !lastMeta) {
+    showToast('Create a stamped image first.', false);
     return;
   }
 
-  var lm = lastMeta || {};
-  var body =
-    'Student: ' + (lm.studentName || 'Unknown') + '\n' +
-    'Teacher: ' + (lm.teacherName || 'Unknown') + ' (' + (lm.teacherEmail || '') + ')\n' +
-    'Subject: ' + (lm.subject || '-') + '\n' +
-    'Time: ' + (lm.ts || '');
+  const file = new File([lastBlob], lastMeta.filename, { type: lastMeta.type });
 
-  if (navigator.canShare && navigator.canShare({ files: [stampedFile] })) {
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({
-        files: [stampedFile],
-        title: (lm.filename || 'PHS evidence'),
-        text: body
+        files: [file],
+        title: 'Pukekohe HS – evidence',
+        text: 'Stamped evidence from Pukekohe High School.'
       });
-      showToast('Shared. Choose your email app to send.');
-    } catch (err) {
-      console.warn('Share cancelled or failed', err);
-      showToast('Share cancelled or not supported on this device.', false);
+      showToast('Shared.');
+    } catch (e) {
+      console.warn(e);
+      showToast('Share cancelled.', false);
+    }
+  } else if (navigator.share) {
+    try {
+      await navigator.share({
+        title: 'Pukekohe HS – evidence',
+        text: 'Stamped evidence from Pukekohe High School.',
+        url: lastObjectUrl
+      });
+      showToast('Shared link.');
+    } catch (e) {
+      console.warn(e);
+      showToast('Share cancelled.', false);
     }
   } else {
     downloadImage();
@@ -581,243 +750,191 @@ async function sharePhoto() {
 }
 
 function downloadImage() {
-  if (!stampedFile) {
+  if (!lastBlob || !lastMeta || !lastObjectUrl) {
     showToast('Nothing to download yet.', false);
     return;
   }
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(stampedFile);
-  var lm = lastMeta || {};
-  a.download = (lm.filename || 'photo.jpg');
+  const a = document.createElement('a');
+  a.href = lastObjectUrl;
+  a.download = lastMeta.filename;
   document.body.appendChild(a);
   a.click();
-  setTimeout(function () {
-    URL.revokeObjectURL(a.href);
-    a.remove();
-  }, 0);
-  showToast('Downloaded.');
-}
-
-function clearAll() {
-  stampedFile = null;
-  lastMeta = null;
-  preview.style.display = 'none';
-  video.style.display = 'block';
-  shareBtn.disabled = true;
-  downloadBtn.disabled = true;
-  showToast('Cleared.');
+  document.body.removeChild(a);
 }
 
 // ---------------------------
-// Teacher / subject / project change handlers
+// Install prompt
 // ---------------------------
-function handleTeacherSelectChange(shouldPersist) {
-  if (typeof shouldPersist === 'undefined') shouldPersist = true;
-
-  var prevSubjectId = subjectSelect.value;
-
-  var idx = teacherSelect.value;
-  var isCustom = idx === 'custom';
-  customTeacherGroup.style.display = isCustom ? '' : 'none';
-
-  if (!isCustom) {
-    var t = selections.teachers.find(function (x) { return x.id === idx; });
-    teacherEmail.value = (t && t.email) ? t.email : '';
-    populateSubjects(idx);
-  } else {
-    teacherEmail.value = '';
-    populateSubjects();
-  }
-
-  var newSubjectId = subjectSelect.value;
-  if (newSubjectId !== prevSubjectId) {
-    populateProjects(newSubjectId);
-  }
-
-  if (shouldPersist) {
-    updateSubjectTextFromSelections();
-  } else {
-    updateOverlay();
-  }
-}
-
-// ---------------------------
-// Keyboard shortcuts
-// ---------------------------
-document.addEventListener('keydown', function (e) {
-  if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
-    if (!shootBtn.disabled) captureAndStamp();
-  }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-    e.preventDefault();
-    if (!shareBtn.disabled) sharePhoto();
-    else if (!downloadBtn.disabled) downloadImage();
-  }
-});
-
-// ---------------------------
-// PWA install prompt
-// ---------------------------
-window.addEventListener('beforeinstallprompt', function (e) {
+window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  installBtn.style.display = '';
+  if (installBtn) installBtn.style.display = '';
 });
 
-if (installBtn) {
-  installBtn.addEventListener('click', async function () {
-    if (!deferredPrompt) return;
-    installBtn.disabled = true;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    installBtn.style.display = 'none';
-  });
-}
-
-window.addEventListener('appinstalled', function () {
-  installBtn.style.display = 'none';
-});
-
-// ---------------------------
-// iOS hint (optional)
-// ---------------------------
-function isIosStandalone() {
-  return (window.navigator.standalone === true) ||
-         window.matchMedia('(display-mode: standalone)').matches;
-}
-function isIos() {
-  return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-}
-if (isIos() && !isIosStandalone()) {
-  // Optional: showToast('Tip: On iPhone/iPad, use Share → Add to Home Screen to install.');
-}
-
-// ---------------------------
-// Camera permission auto-start
-// ---------------------------
-if (navigator.mediaDevices && navigator.permissions) {
-  navigator.permissions.query({ name: 'camera' }).then(function (p) {
-    if (p.state === 'granted') initCamera();
-  }).catch(function () {});
-}
-
-// ---------------------------
-// Load selections.json
-// ---------------------------
-async function loadSelections() {
+async function handleInstallClick() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
   try {
-    var res = await fetch('selections.json');
-    selections = await res.json();
-    populateTeachersFromSelections();
-    populateSubjects();
-    restore();
-  } catch (err) {
-    console.error('Failed to load selections.json', err);
-    showToast('Could not load selections (teachers/subjects).', false);
-    updateOverlay();
+    await deferredPrompt.userChoice;
+  } finally {
+    deferredPrompt = null;
+    if (installBtn) installBtn.style.display = 'none';
   }
-}
-
-// ---------------------------
-// Service Worker registration (/phsphoto/)
-// ---------------------------
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async function () {
-    try {
-      var reg = await navigator.serviceWorker.register('/phsphoto/service-worker.js');
-      if (reg && reg.waiting) {
-        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-      }
-      reg.addEventListener('updatefound', function () {
-        var sw = reg.installing;
-        if (sw) {
-          sw.addEventListener('statechange', function () {
-            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-              showToast('Update available. Reload for latest.');
-            }
-          });
-        }
-      });
-      navigator.serviceWorker.addEventListener('controllerchange', function () {});
-    } catch (err) {
-      console.warn('SW registration failed', err);
-    }
-  });
 }
 
 // ---------------------------
 // Event wiring
 // ---------------------------
-initBtn.addEventListener('click', initCamera);
-helpBtn.addEventListener('click', function () { tipsDialog.showModal(); });
-themeBtn.addEventListener('click', toggleTheme);
-shootBtn.addEventListener('click', captureAndStamp);
-fileStampBtn.addEventListener('click', chooseFileAndStamp);
-shareBtn.addEventListener('click', sharePhoto);
-downloadBtn.addEventListener('click', downloadImage);
-clearBtn.addEventListener('click', clearAll);
-
-teacherSelect.addEventListener('change', function () {
-  handleTeacherSelectChange(true);
-});
-
-teacherEmail.addEventListener('input', persist);
-
-customTeacherName.addEventListener('input', function () {
-  updateOverlay();
-  persist();
-});
-
-nameInput.addEventListener('input', function () {
-  updateOverlay();
-  persist();
-});
-
-subjectSelect.addEventListener('change', function () {
-  var subjId = subjectSelect.value;
-  populateProjects(subjId);
-
-  if (subjId) {
-    populateTeachersFromSelections(subjId);
-  } else {
-    populateTeachersFromSelections();
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopCamera();
   }
-  updateSubjectTextFromSelections();
 });
 
-projectSelect.addEventListener('change', function () {
-  var projMeta = getSelectedProjectMeta();
-  var showCustom = !!(projMeta && projMeta.allowCustomName);
-  customProjectGroup.style.display = showCustom ? '' : 'none';
-  if (!showCustom) customProjectInput.value = '';
-  updateSubjectTextFromSelections();
+window.addEventListener('beforeunload', () => {
+  stopCamera();
 });
 
-customProjectInput.addEventListener('input', function () {
-  updateSubjectTextFromSelections();
-});
-
-if (copyEmailBtn) {
-  copyEmailBtn.addEventListener('click', async function () {
-    if (!teacherEmail.value) {
-      showToast('No email to copy', false);
-      return;
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const tag = (e.target && e.target.tagName) || '';
+    if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(tag)) return;
+    if (!shootBtn?.disabled) {
+      e.preventDefault();
+      shootBtn.click();
     }
-    try {
-      await navigator.clipboard.writeText(teacherEmail.value);
-      showToast('Email copied');
-    } catch (e) {
-      showToast('Copy failed', false);
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    if (shareBtn && !shareBtn.disabled) {
+      shareBtn.click();
+    } else if (downloadBtn && !downloadBtn.disabled) {
+      downloadBtn.click();
     }
-  });
-}
+  }
+});
 
 // ---------------------------
 // Init
 // ---------------------------
-(function init() {
+document.addEventListener('DOMContentLoaded', () => {
   setTheme(getTheme());
   loadRecentStudents();
+  updateOverlay();
   loadSelections();
-})();
+
+  // input change handlers
+  if (nameInput) nameInput.addEventListener('input', updateOverlay);
+  if (teacherSelect) {
+    teacherSelect.addEventListener('change', () => {
+      updateTeacherFromSelect();
+      updateOverlay();
+    });
+  }
+  if (teacherEmailInput) teacherEmailInput.addEventListener('input', saveState);
+  if (customTeacherNameInput) customTeacherNameInput.addEventListener('input', updateOverlay);
+  if (subjectSelect) {
+    subjectSelect.addEventListener('change', () => {
+      populateProjects(subjectSelect.value);
+      updateOverlay();
+    });
+  }
+  if (projectSelect) {
+    projectSelect.addEventListener('change', () => {
+      if (customProjectGroup) {
+        customProjectGroup.style.display =
+          subjectSelect.value === '__custom' || projectSelect.value === '__custom' ? '' : 'none';
+      }
+      updateOverlay();
+    });
+  }
+  if (customProjectInput) customProjectInput.addEventListener('input', updateOverlay);
+  if (customTextInput) customTextInput.addEventListener('input', updateOverlay);
+
+  // buttons
+  if (initBtn) {
+    initBtn.addEventListener('click', () => {
+      initCamera();
+    });
+  }
+
+  if (flipBtn) {
+    flipBtn.addEventListener('click', () => {
+      flipCamera();
+    });
+  }
+
+  if (fileInput && fileStampBtn) {
+    fileStampBtn.addEventListener('click', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) {
+        showToast('Choose a photo file first.', false);
+        return;
+      }
+      stampFromImageFile(file);
+    });
+  }
+
+  if (shootBtn) {
+    shootBtn.addEventListener('click', () => {
+      stampFromVideo();
+    });
+  }
+
+  if (shareBtn) {
+    shareBtn.addEventListener('click', () => {
+      shareImage();
+    });
+  }
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      downloadImage();
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      lastBlob = null;
+      lastMeta = null;
+      if (previewImg) previewImg.src = '';
+      if (shareBtn) shareBtn.disabled = true;
+      if (downloadBtn) downloadBtn.disabled = true;
+      showToast('Cleared.');
+    });
+  }
+
+  if (helpBtn && tipsDialog) {
+    helpBtn.addEventListener('click', () => {
+      try {
+        tipsDialog.showModal();
+      } catch {
+        tipsDialog.setAttribute('open', 'open');
+      }
+    });
+  }
+
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      toggleTheme();
+    });
+  }
+
+  if (installBtn) {
+    installBtn.addEventListener('click', () => {
+      handleInstallClick();
+    });
+  }
+
+  if (copyEmailBtn && teacherEmailInput) {
+    copyEmailBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(teacherEmailInput.value || '');
+        showToast('Email copied.');
+      } catch {
+        showToast('Could not copy email.', false);
+      }
+    });
+  }
+});

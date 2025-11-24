@@ -561,11 +561,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadRecentStudents();
   loadSelections();
 
-  // Auto-start camera ONLY if user approved once
-  const camApproved = localStorage.getItem(CAM_PERMISSION_KEY) === "yes";
-  if (camApproved) {
-    initCamera();
-  }
+
 
   initBtn.addEventListener("click", () => initCamera());
 

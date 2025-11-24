@@ -391,56 +391,115 @@ function drawStamped(w, h, drawFn) {
   canvas.height = h;
   const ctx = canvas.getContext("2d");
 
+  // Draw the base image (video frame or uploaded file)
   drawFn(ctx);
 
+  // Size + layout
   const pad = Math.round(w * 0.02);
-  const lh = Math.round(h * 0.03);
-  const boxH = lh * 4;
+
+  // Clamp font size so it looks similar across devices
+  const approx = h * 0.03;
+  const fontSize = Math.round(Math.max(18, Math.min(approx, 32))); // between 18px and 32px
+  const boxH = fontSize * 4; // room for 3 lines + padding
+
   const x = pad;
   const y = h - boxH - pad;
   const boxW = Math.round(w * 0.8);
 
-  const g = ctx.createLinearGradient(x, y + boxH, x, y);
-  g.addColorStop(0, "rgba(15,23,42,0.95)");
-  g.addColorStop(0.7, "rgba(15,23,42,0.7)");
-  g.addColorStop(1, "transparent");
-
-  ctx.fillStyle = g;
-  ctx.fillRect(x, y, boxW, boxH);
-
   const [l1, l2, l3] = buildStampLines();
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "right";
-  ctx.textBaseline = "top";
-  ctx.font = `${lh}px system-ui`;
 
-  let ty = y + pad;
-  const tx = x + boxW - pad;
-  ctx.fillText(l1, tx, ty);
-  ty += lh + 2;
-  ctx.fillText(l2, tx, ty);
-  ty += lh + 2;
-  ctx.fillText(l3, tx, ty);
+  // We’ll draw the shield if we can load it, otherwise fall back to text-only
+  const crestImg = new Image();
+  // Use your existing app icon as the shield image
+  crestImg.src = "icon-192.png";  // make sure icon-192.png is in the same folder as index.html
 
-  canvas.toBlob((blob) => {
-    lastBlob = blob;
-    lastObjectUrl && URL.revokeObjectURL(lastObjectUrl);
-    lastObjectUrl = URL.createObjectURL(blob);
+  crestImg.onload = () => {
+    // Gradient background
+    const g = ctx.createLinearGradient(x, y + boxH, x, y);
+    g.addColorStop(0, "rgba(15,23,42,0.95)");
+    g.addColorStop(0.7, "rgba(15,23,42,0.7)");
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, boxW, boxH);
 
-    const now = new Date();
-    const nm = nameInput.value.trim().replace(/\s+/g, "_") || "student";
+    // Draw shield on the left side inside the box
+    const crestSize = boxH - pad * 2;
+    const crestX = x + pad;
+    const crestY = y + pad;
+    ctx.drawImage(crestImg, crestX, crestY, crestSize, crestSize);
 
-    lastMeta = {
-      filename: `PHS_${nm}_${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}.png`,
-      type: blob.type,
-    };
+    // Text
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.font = `${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 
-    previewImg.src = lastObjectUrl;
-    shareBtn.disabled = false;
-    downloadBtn.disabled = false;
-    addRecentStudent(nameInput.value.trim());
-  });
+    let ty = y + pad;
+    const tx = x + boxW - pad;
+    ctx.fillText(l1, tx, ty);
+    ty += fontSize + 2;
+    ctx.fillText(l2, tx, ty);
+    ty += fontSize + 2;
+    ctx.fillText(l3, tx, ty);
+
+    finishStampedBlob();
+  };
+
+  crestImg.onerror = () => {
+    // If the shield can't load, fall back to the old text-only box
+    const g = ctx.createLinearGradient(x, y + boxH, x, y);
+    g.addColorStop(0, "rgba(15,23,42,0.95)");
+    g.addColorStop(0.7, "rgba(15,23,42,0.7)");
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, boxW, boxH);
+
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.font = `${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+
+    let ty = y + pad;
+    const tx = x + boxW - pad;
+    ctx.fillText(l1, tx, ty);
+    ty += fontSize + 2;
+    ctx.fillText(l2, tx, ty);
+    ty += fontSize + 2;
+    ctx.fillText(l3, tx, ty);
+
+    finishStampedBlob();
+  };
+
+  // common “save to blob + preview” code
+  function finishStampedBlob() {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        showToast("Could not create image", false);
+        return;
+      }
+
+      lastBlob = blob;
+      if (lastObjectUrl) {
+        URL.revokeObjectURL(lastObjectUrl);
+      }
+      lastObjectUrl = URL.createObjectURL(blob);
+
+      const now = new Date();
+      const nm = nameInput.value.trim().replace(/\s+/g, "_") || "student";
+
+      lastMeta = {
+        filename: `PHS_${nm}_${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}.png`,
+        type: blob.type,
+      };
+
+      previewImg.src = lastObjectUrl;
+      shareBtn.disabled = false;
+      downloadBtn.disabled = false;
+      addRecentStudent(nameInput.value.trim());
+    });
+  }
 }
+
 
 function stampFromVideo() {
   if (!requireStudentName()) return;

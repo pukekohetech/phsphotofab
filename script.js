@@ -103,8 +103,10 @@ function setTheme(theme) {
   localStorage.setItem(THEME_KEY, theme);
 }
 function toggleTheme() {
-  const next = getTheme() === "light" ? "dark" :
-               getTheme() === "dark" ? "auto" : "light";
+  const current = getTheme();
+  const next =
+    current === "light" ? "dark" :
+    current === "dark" ? "auto" : "light";
   setTheme(next);
   showToast(`Theme: ${next}`);
 }
@@ -198,6 +200,10 @@ async function loadSelections() {
     if (state.teacherId) teacherSelect.value = state.teacherId;
 
     updateTeacherFromSelect();
+
+    // Ensure custom project visibility restored correctly
+    customProjectGroup.style.display =
+      state.subjectId === "__custom" || state.projectId === "__custom" ? "" : "none";
   } else {
     populateProjects(subjectSelect.value);
   }
@@ -264,8 +270,7 @@ function populateProjects(subjectId) {
   projectSelect.appendChild(new Option("Other project / task", "__custom"));
 
   customProjectGroup.style.display =
-    subjectId === "__custom" ? "" :
-    projectSelect.value === "__custom" ? "" : "none";
+    subjectId === "__custom" || projectSelect.value === "__custom" ? "" : "none";
 }
 
 function renderTeacherList() {
@@ -396,22 +401,47 @@ async function flipCamera() {
  *  UNIVERSAL BLOB HANDLER (Fixes PREVIEW)
  * ============================================================*/
 function handleStampedBlob(blob) {
+  if (!blob) {
+    console.error("handleStampedBlob called with null/undefined blob");
+    showToast("Could not create image from canvas.", false);
+    return;
+  }
+
   lastBlob = blob;
 
-  if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl);
-  lastObjectUrl = URL.createObjectURL(blob);
+  // Create a fresh URL first
+  const newUrl = URL.createObjectURL(blob);
 
-  // Safari & Chrome sometimes need a tick before updating preview
+  // Revoke the previous URL after switching
+  if (lastObjectUrl && lastObjectUrl !== newUrl) {
+    try {
+      URL.revokeObjectURL(lastObjectUrl);
+    } catch (e) {
+      console.warn("Failed to revoke old object URL", e);
+    }
+  }
+  lastObjectUrl = newUrl;
+
+  if (!previewImg) {
+    console.error("previewImg element not found");
+    showToast("Preview element missing in DOM.", false);
+    return;
+  }
+
+  // Force refresh even if URL might match previous
+  previewImg.removeAttribute("src");
+
+  // Small delay improves reliability on Safari / iOS
   setTimeout(() => {
-    previewImg.src = lastObjectUrl;
-  }, 20);
+    previewImg.src = newUrl;
+  }, 30);
 
   const now = new Date();
   const nm = nameInput.value.trim().replace(/\s+/g, "_") || "student";
 
   lastMeta = {
     filename: `PHS_${nm}_${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}.png`,
-    type: blob.type,
+    type: blob.type || "image/png",
   };
 
   shareBtn.disabled = false;
@@ -454,6 +484,8 @@ function drawStampedImage(w, h, drawer) {
   canvas.height = h;
   const ctx = canvas.getContext("2d");
 
+  console.log("Drawing stamped image", { w, h });
+
   drawer(ctx);
 
   const pad = Math.round(w * 0.02);
@@ -488,12 +520,21 @@ function drawStampedImage(w, h, drawer) {
 
   // --- SAFARI-SAFE BLOB CREATION ---
   canvas.toBlob((blob) => {
+    console.log("canvas.toBlob result:", blob);
     if (!blob) {
       // Safari fallback using dataURL → blob
       const dataURL = canvas.toDataURL("image/png");
+      console.log("Using dataURL fallback");
       fetch(dataURL)
         .then((r) => r.blob())
-        .then((fallbackBlob) => handleStampedBlob(fallbackBlob));
+        .then((fallbackBlob) => {
+          console.log("Fallback blob created:", fallbackBlob);
+          handleStampedBlob(fallbackBlob);
+        })
+        .catch((err) => {
+          console.error("Fallback blob creation failed", err);
+          showToast("Could not create image.", false);
+        });
       return;
     }
     handleStampedBlob(blob);
@@ -543,10 +584,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   subjectSelect.addEventListener("change", () => {
     populateProjects(subjectSelect.value);
+    customProjectGroup.style.display =
+      subjectSelect.value === "__custom" || projectSelect.value === "__custom"
+        ? ""
+        : "none";
     updateOverlay();
   });
 
-  projectSelect.addEventListener("change", updateOverlay);
+  projectSelect.addEventListener("change", () => {
+    customProjectGroup.style.display =
+      subjectSelect.value === "__custom" || projectSelect.value === "__custom"
+        ? ""
+        : "none";
+    updateOverlay();
+  });
+
   customProjectInput.addEventListener("input", updateOverlay);
   customTextInput.addEventListener("input", updateOverlay);
 
@@ -565,7 +617,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   clearBtn.addEventListener("click", () => {
     lastBlob = null;
-    previewImg.src = "";
+    if (lastObjectUrl) {
+      try {
+        URL.revokeObjectURL(lastObjectUrl);
+      } catch (e) {
+        console.warn("Failed to revoke object URL on clear", e);
+      }
+      lastObjectUrl = null;
+    }
+    previewImg.removeAttribute("src");
     shareBtn.disabled = true;
     downloadBtn.disabled = true;
     showToast("Cleared");

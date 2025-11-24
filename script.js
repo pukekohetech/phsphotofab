@@ -198,7 +198,7 @@ function loadState() {
  * ============================================================*/
 async function loadSelections() {
   try {
-    const res = await fetch("selections.json", { cache: "no-store" });
+    const res = await fetch("selections.json?v=2", { cache: "no-store" });
     selections = await res.json();
   } catch {
     showToast("Could not load teacher list.", false);

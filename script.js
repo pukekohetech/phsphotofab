@@ -71,9 +71,20 @@ let recentStudents = [];
 // ---------------------------
 // Logo / Shield
 // ---------------------------
+/**
+ * Load the crest used in the stamped image. In the original
+ * implementation the code attempted to load a non‑existent
+ * `phs-shield.png`. This prevented the crest from appearing on
+ * the final stamped photo and produced console warnings. To
+ * restore the shield we copy one of the supplied crest assets
+ * (see the README for available sizes) into `phs-shield.png` in
+ * the project root. If you update the crest in the future, be
+ * sure to mirror it here as well.
+ */
 const logoImg = new Image();
 let logoReady = false;
-// Make sure this path points to your actual shield image
+// Always load the shield using a stable file name. A copy of
+// `crest-512.png` is provided at build time as `phs-shield.png`.
 logoImg.src = "phs-shield.png";
 
 logoImg.onload = () => {
@@ -523,19 +534,36 @@ function drawStampedImage(w, h, drawer) {
   canvas.height = h;
   const ctx = canvas.getContext("2d");
 
+  // Use high quality scaling when resizing images. Without this the
+  // canvas may look soft on high DPI screens. Enabling image
+  // smoothing and requesting the highest quality ensures text and
+  // logo render crisply.
+  ctx.imageSmoothingEnabled = true;
+  if (ctx.imageSmoothingQuality) {
+    ctx.imageSmoothingQuality = 'high';
+  }
+
   console.log("Drawing stamped image", { w, h });
 
+  // Draw the base image onto the canvas via the supplied drawer
   drawer(ctx);
 
-  const pad = Math.round(w * 0.02);
-  const lh = Math.round(h * 0.03);
+  // Compute sizes relative to the smallest image dimension. Using
+  // minEdge rather than width/height separately yields more
+  // consistent results across portrait/landscape photos and across
+  // devices with varying aspect ratios.
+  const minEdge = Math.min(w, h);
+  const pad = Math.round(minEdge * 0.02);
+  const lh = Math.round(minEdge * 0.03);
+  const logoSize = Math.round(minEdge * 0.12);
 
-  // --- Draw shield / crest in top-left ---
+  // --- Draw shield / crest in top‑left ---
   if (logoReady) {
-    const logoSize = Math.round(Math.min(w, h) * 0.12); // 12% of shortest edge
     ctx.drawImage(logoImg, pad, pad, logoSize, logoSize);
   }
 
+  // Dimensions for the gradient box behind the text. We reserve
+  // space for three lines plus a small margin.
   const boxH = lh * 4;
   const x = pad;
   const y = h - boxH - pad;

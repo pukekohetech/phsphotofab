@@ -27,6 +27,7 @@ const CORE_ASSETS = [
   atRoot('/crest-152.png'),
   atRoot('/crest-192.png'),
   atRoot('/crest-512.png')
+  ,atRoot('/phs-shield.png')
 ];
 
 // -----------------------------------------------------

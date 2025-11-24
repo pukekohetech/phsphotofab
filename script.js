@@ -1,7 +1,9 @@
 /**************************************************************
- *  Pukekohe HS – Evidence Stamper (Stable Camera + Preview Fix)
+ *  Pukekohe HS – Evidence Stamper (Shield + Sharper Images)
  *  • Camera now reliable on Chrome, Android, iOS Safari, PWA
  *  • Preview ALWAYS works (toBlob fallback + safe delays)
+ *  • Shield restored on stamped image
+ *  • Higher-res capture for camera + file input
  *  • All IDs, UI behaviours, and logic preserved exactly
  **************************************************************/
 
@@ -66,6 +68,22 @@ let lastMeta = null;
 let deferredPrompt = null;
 let recentStudents = [];
 
+// ---------------------------
+// Logo / Shield
+// ---------------------------
+const logoImg = new Image();
+let logoReady = false;
+// Make sure this path points to your actual shield image
+logoImg.src = "phs-shield.png";
+
+logoImg.onload = () => {
+  logoReady = true;
+};
+
+logoImg.onerror = () => {
+  console.warn("Shield image failed to load (phs-shield.png)");
+};
+
 /* ============================================================
  *  TOAST
  * ============================================================*/
@@ -85,7 +103,7 @@ function showToast(message, ok = true, duration = 2400) {
 function requireStudentName() {
   const name = (nameInput?.value || "").trim();
   if (!name) {
-    showToast("Enter student name first.", false);
+    showToast("Enter student ID first.", false);
     nameInput.focus();
     return false;
   }
@@ -330,7 +348,7 @@ function updateOverlay() {
 }
 
 /* ============================================================
- *  CAMERA (FULLY PATCHED)
+ *  CAMERA (FULLY PATCHED + HIGHER RES)
  * ============================================================*/
 function stopCamera() {
   stream?.getTracks().forEach((t) => t.stop());
@@ -369,15 +387,36 @@ async function initCamera() {
 
   if (videoDevices.length) {
     const dev = videoDevices[currentDeviceIndex];
-    constraints = { audio: false, video: { deviceId: { exact: dev.deviceId } } };
+    constraints = {
+      audio: false,
+      video: {
+        deviceId: { exact: dev.deviceId },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    };
   } else {
-    constraints = { audio: false, video: { facingMode: "environment" } };
+    constraints = {
+      audio: false,
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    };
   }
 
   try {
     stream = await navigator.mediaDevices.getUserMedia(constraints);
   } catch {
-    constraints = { audio: false, video: { facingMode: "environment" } };
+    constraints = {
+      audio: false,
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    };
     stream = await navigator.mediaDevices.getUserMedia(constraints);
   }
 
@@ -466,7 +505,7 @@ function stampFromFile(file) {
   if (!requireStudentName()) return;
   const img = new Image();
   img.onload = () => {
-    const max = 1920;
+    const max = 2560; // slightly higher max for sharper stamped images
     let w = img.width,
       h = img.height;
     if (w > max || h > max) {
@@ -490,6 +529,13 @@ function drawStampedImage(w, h, drawer) {
 
   const pad = Math.round(w * 0.02);
   const lh = Math.round(h * 0.03);
+
+  // --- Draw shield / crest in top-left ---
+  if (logoReady) {
+    const logoSize = Math.round(Math.min(w, h) * 0.12); // 12% of shortest edge
+    ctx.drawImage(logoImg, pad, pad, logoSize, logoSize);
+  }
+
   const boxH = lh * 4;
   const x = pad;
   const y = h - boxH - pad;

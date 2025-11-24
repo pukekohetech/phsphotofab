@@ -1,10 +1,9 @@
 /**************************************************************
- *  Pukekohe HS – Evidence Stamper (Streamlined Version)
- *  Includes:
- *  • Reliable enumerateDevices flipCamera
- *  • Requires student name before stamping
- *  • Teacher email autofill
- *  • Cleaned UI logic (no Tips / Dialog references)
+ *  Pukekohe HS – Evidence Stamper (Stable Camera Version)
+ *  • Bullet-proof camera init (iOS + Chrome + PWA safe)
+ *  • Safe enumerateDevices (permission-first)
+ *  • Reliable flip-camera support
+ *  • All original features kept exactly the same
  **************************************************************/
 
 // ---------------------------
@@ -60,33 +59,30 @@ let selections = { teachers: [], subjects: [], projects: [] };
 let stream = null;
 let videoDevices = [];
 let currentDeviceIndex = 0;
-let currentFacingMode = "environment";
 
 let lastBlob = null;
-let lastMeta = null;
 let lastObjectUrl = null;
+let lastMeta = null;
 
 let deferredPrompt = null;
 let recentStudents = [];
 
-// ---------------------------
-// Toast helper
-// ---------------------------
+/* ============================================================
+ *  TOAST
+ * ============================================================*/
 function showToast(message, ok = true, duration = 2400) {
   if (!toastEl) return;
   toastEl.textContent = message;
   toastEl.classList.add("show");
-
   toastEl.style.background = ok
-    ? "rgba(15, 23, 42, 0.95)"
-    : "rgba(185, 28, 28, 0.95)";
-
+    ? "rgba(15,23,42,0.95)"
+    : "rgba(185,28,28,0.95)";
   setTimeout(() => toastEl.classList.remove("show"), duration);
 }
 
-// ---------------------------
-// Require student name
-// ---------------------------
+/* ============================================================
+ *  REQUIRE STUDENT NAME
+ * ============================================================*/
 function requireStudentName() {
   const name = (nameInput?.value || "").trim();
   if (!name) {
@@ -97,18 +93,16 @@ function requireStudentName() {
   return true;
 }
 
-// ---------------------------
-// Theme
-// ---------------------------
+/* ============================================================
+ *  THEME
+ * ============================================================*/
 function getTheme() {
   return localStorage.getItem(THEME_KEY) || "auto";
 }
-
 function setTheme(theme) {
   html.dataset.theme = theme;
   localStorage.setItem(THEME_KEY, theme);
 }
-
 function toggleTheme() {
   const current = getTheme();
   const next =
@@ -117,9 +111,9 @@ function toggleTheme() {
   showToast(`Theme: ${next}`);
 }
 
-// ---------------------------
-// Load recent students
-// ---------------------------
+/* ============================================================
+ *  RECENT STUDENTS
+ * ============================================================*/
 function loadRecentStudents() {
   try {
     recentStudents = JSON.parse(localStorage.getItem(STUDENTS_KEY)) || [];
@@ -128,11 +122,9 @@ function loadRecentStudents() {
   }
   renderRecentStudents();
 }
-
 function saveRecentStudents() {
   localStorage.setItem(STUDENTS_KEY, JSON.stringify(recentStudents.slice(0, 20)));
 }
-
 function addRecentStudent(name) {
   if (!name) return;
   const ix = recentStudents.indexOf(name);
@@ -141,7 +133,6 @@ function addRecentStudent(name) {
   saveRecentStudents();
   renderRecentStudents();
 }
-
 function renderRecentStudents() {
   recentStudentsDatalist.innerHTML = "";
   recentStudents.forEach((n) => {
@@ -151,9 +142,9 @@ function renderRecentStudents() {
   });
 }
 
-// ---------------------------
-// Save/Load state
-// ---------------------------
+/* ============================================================
+ *  STATE SAVE / LOAD
+ * ============================================================*/
 function saveState() {
   const state = {
     name: nameInput.value,
@@ -178,16 +169,15 @@ function loadState() {
     customTeacherNameInput.value = state.customTeacherName || "";
     customProjectInput.value = state.customProject || "";
     customTextInput.value = state.customText || "";
-
     return state;
   } catch {
     return null;
   }
 }
 
-// ---------------------------
-// Load selections.json
-// ---------------------------
+/* ============================================================
+ *  LOAD selections.json
+ * ============================================================*/
 async function loadSelections() {
   try {
     const res = await fetch("selections.json", { cache: "no-store" });
@@ -218,22 +208,16 @@ async function loadSelections() {
   updateOverlay();
 }
 
-// Teachers dropdown
+// ------------ Teachers
 function populateTeachers() {
   teacherSelect.innerHTML = "";
   selections.teachers.forEach((t) => {
-    const opt = document.createElement("option");
-    opt.value = t.id;
-    opt.textContent = t.name;
-    teacherSelect.appendChild(opt);
+    teacherSelect.appendChild(new Option(t.name, t.id));
   });
-
   const divider = new Option("──────────", "", true, false);
   divider.disabled = true;
   teacherSelect.appendChild(divider);
-
   teacherSelect.appendChild(new Option("Other teacher (custom)", "__custom"));
-
   teacherSelect.value = selections.teachers[0]?.id || "";
 }
 
@@ -249,56 +233,45 @@ function updateTeacherFromSelect() {
   }
 }
 
-// Subjects dropdown
+// ------------ Subjects
 function populateSubjects() {
   subjectSelect.innerHTML = "";
   selections.subjects.forEach((s) => {
     subjectSelect.appendChild(new Option(s.label, s.id));
   });
-
   subjectSelect.appendChild(new Option("──────────", "", true, false));
   subjectSelect.lastChild.disabled = true;
-
   subjectSelect.appendChild(new Option("Other subject / context", "__custom"));
-
   subjectSelect.value = selections.subjects[0]?.id || "";
 }
 
-// Projects dropdown
+// ------------ Projects
 function populateProjects(subjectId) {
   projectSelect.innerHTML = "";
-
   if (subjectId !== "__custom") {
     selections.projects
       .filter((p) => p.subjectId === subjectId)
       .forEach((p) => projectSelect.appendChild(new Option(p.label, p.id)));
   }
-
   projectSelect.appendChild(new Option("──────────", "", true, false));
   projectSelect.lastChild.disabled = true;
-
   projectSelect.appendChild(new Option("Other project / task", "__custom"));
-
   customProjectGroup.style.display =
     subjectId === "__custom" ? "" : projectSelect.value === "__custom" ? "" : "none";
 }
 
-// Teacher list display
 function renderTeacherList() {
   teacherListEl.innerHTML = "";
   selections.teachers.forEach((t) => {
     const li = document.createElement("li");
-    li.innerHTML = `
-      <strong>${t.name}</strong>
-      <div class="small">${t.email || "No email"}</div>
-    `;
+    li.innerHTML = `<strong>${t.name}</strong><div class="small">${t.email || "No email"}</div>`;
     teacherListEl.appendChild(li);
   });
 }
 
-// ---------------------------
-// Stamp overlay
-// ---------------------------
+/* ============================================================
+ *  STAMP OVERLAY
+ * ============================================================*/
 function getNowStampDisplay() {
   const now = new Date();
   return now.toLocaleString(undefined, {
@@ -326,6 +299,7 @@ function buildStampLines() {
       subjectSelect.value === "__custom"
         ? customProjectInput.value
         : selections.subjects.find((s) => s.id === subjectSelect.value)?.label;
+
     const proj =
       projectSelect.value === "__custom"
         ? customProjectInput.value
@@ -333,7 +307,6 @@ function buildStampLines() {
 
     line3 = subj && proj ? `${subj} • ${proj}` : subj || proj || "Learning evidence";
   }
-
   return [line1, line2, line3];
 }
 
@@ -343,10 +316,27 @@ function updateOverlay() {
   saveState();
 }
 
-// ---------------------------
-// CAMERA (flip with enumerateDevices)
-// ---------------------------
+/* ============================================================
+ *  CAMERA (rewritten to be bullet-proof)
+ * ============================================================*/
+
+// --- Stop camera
+function stopCamera() {
+  stream?.getTracks().forEach((t) => t.stop());
+  video.srcObject = null;
+  shootBtn.disabled = true;
+}
+
+// --- Permission-first device enumeration
 async function ensureVideoDevices() {
+  try {
+    // Required by iOS + Chrome to reveal labels
+    await navigator.mediaDevices.getUserMedia({ video: true });
+  } catch {
+    showToast("Camera permission is required.", false);
+    return;
+  }
+
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     videoDevices = devices.filter((d) => d.kind === "videoinput");
@@ -355,53 +345,58 @@ async function ensureVideoDevices() {
       /back|rear|environment/i.test(d.label)
     );
     if (backIndex >= 0) currentDeviceIndex = backIndex;
-  } catch {}
+  } catch (err) {
+    console.error(err);
+    showToast("Unable to list cameras.", false);
+  }
 }
 
-async function initCamera(facingMode) {
+// --- Init camera
+async function initCamera() {
   stopCamera();
 
-  if (!videoDevices.length) await ensureVideoDevices();
+  await ensureVideoDevices();
 
-  let constraints = { audio: false, video: {} };
+  let constraints;
 
   if (videoDevices.length) {
-    constraints.video.deviceId = { exact: videoDevices[currentDeviceIndex].deviceId };
+    const dev = videoDevices[currentDeviceIndex];
+    constraints = { audio: false, video: { deviceId: { exact: dev.deviceId } } };
   } else {
-    constraints.video.facingMode = { ideal: facingMode || "environment" };
+    constraints = { audio: false, video: { facingMode: "environment" } };
   }
 
   try {
     stream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = stream;
-    await video.play();
-    shootBtn.disabled = false;
-    showToast("Camera ready");
-  } catch {
-    showToast("Camera failed.", false);
+  } catch (e) {
+    // fallback
+    constraints = { audio: false, video: { facingMode: "environment" } };
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
   }
+
+  video.srcObject = stream;
+  await video.play();
+  shootBtn.disabled = false;
+  showToast("Camera ready");
 }
 
-function stopCamera() {
-  stream?.getTracks().forEach((t) => t.stop());
-  video.srcObject = null;
-  shootBtn.disabled = true;
-}
-
+// --- Flip camera
 async function flipCamera() {
   if (!requireStudentName()) return;
+
   if (!videoDevices.length) await ensureVideoDevices();
   if (videoDevices.length <= 1) {
     showToast("Only one camera available.", false);
     return;
   }
+
   currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
   await initCamera();
 }
 
-// ---------------------------
-// STAMPING
-// ---------------------------
+/* ============================================================
+ *  STAMPING
+ * ============================================================*/
 function stampFromVideo() {
   if (!requireStudentName()) return;
   if (!video.videoWidth) return showToast("Camera not ready.", false);
@@ -428,7 +423,6 @@ function stampFromFile(file) {
   img.src = URL.createObjectURL(file);
 }
 
-// Draw stamp + export blob
 function drawStampedImage(w, h, drawer) {
   canvas.width = w;
   canvas.height = h;
@@ -447,7 +441,6 @@ function drawStampedImage(w, h, drawer) {
   g.addColorStop(0, "rgba(15,23,42,0.95)");
   g.addColorStop(0.7, "rgba(15,23,42,0.7)");
   g.addColorStop(1, "transparent");
-
   ctx.fillStyle = g;
   ctx.fillRect(x, y, boxW, boxH);
 
@@ -487,9 +480,9 @@ function drawStampedImage(w, h, drawer) {
   });
 }
 
-// ---------------------------
-// SHARE / DOWNLOAD
-// ---------------------------
+/* ============================================================
+ *  SHARE / DOWNLOAD
+ * ============================================================*/
 async function shareStamped() {
   if (!lastBlob) return showToast("Nothing to share.", false);
   const file = new File([lastBlob], lastMeta.filename, { type: lastMeta.type });
@@ -510,9 +503,9 @@ function downloadStamped() {
   a.click();
 }
 
-// ---------------------------
-// INIT EVENTS
-// ---------------------------
+/* ============================================================
+ *  INIT EVENTS
+ * ============================================================*/
 document.addEventListener("DOMContentLoaded", () => {
   setTheme(getTheme());
   loadRecentStudents();
@@ -538,7 +531,6 @@ document.addEventListener("DOMContentLoaded", () => {
   customTextInput.addEventListener("input", updateOverlay);
 
   initBtn.addEventListener("click", () => initCamera());
-
   flipBtn.addEventListener("click", () => flipCamera());
 
   fileStampBtn.addEventListener("click", () => {
@@ -548,7 +540,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   shootBtn.addEventListener("click", stampFromVideo);
-
   shareBtn.addEventListener("click", shareStamped);
   downloadBtn.addEventListener("click", downloadStamped);
 

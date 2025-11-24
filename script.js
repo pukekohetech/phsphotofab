@@ -1,6 +1,10 @@
 /**************************************************************
  *  Pukekohe HS – Evidence Stamper (Streamlined Version)
- *  Option B: Auto-camera AFTER first approval
+ *  Includes:
+ *  • Reliable enumerateDevices flipCamera
+ *  • Requires student name before stamping
+ *  • Teacher email autofill
+ *  • Cleaned UI logic (no Tips / Dialog references)
  **************************************************************/
 
 // ---------------------------
@@ -50,7 +54,6 @@ const teacherListEl = document.getElementById("teacherList");
 const THEME_KEY = "phs-photo-theme";
 const STUDENTS_KEY = "phs-photo-recent-students";
 const STATE_KEY = "phs-photo-last-state";
-const CAM_PERMISSION_KEY = "phs-photo-camera-approved";
 
 let selections = { teachers: [], subjects: [], projects: [] };
 
@@ -67,14 +70,16 @@ let deferredPrompt = null;
 let recentStudents = [];
 
 // ---------------------------
-// Toast
+// Toast helper
 // ---------------------------
-function showToast(message, ok = true, duration = 2200) {
+function showToast(message, ok = true, duration = 2400) {
+  if (!toastEl) return;
   toastEl.textContent = message;
   toastEl.classList.add("show");
+
   toastEl.style.background = ok
-    ? "rgba(15,23,42,0.95)"
-    : "rgba(185,28,28,0.95)";
+    ? "rgba(15, 23, 42, 0.95)"
+    : "rgba(185, 28, 28, 0.95)";
 
   setTimeout(() => toastEl.classList.remove("show"), duration);
 }
@@ -83,7 +88,7 @@ function showToast(message, ok = true, duration = 2200) {
 // Require student name
 // ---------------------------
 function requireStudentName() {
-  const name = (nameInput.value || "").trim();
+  const name = (nameInput?.value || "").trim();
   if (!name) {
     showToast("Enter student name first.", false);
     nameInput.focus();
@@ -105,14 +110,15 @@ function setTheme(theme) {
 }
 
 function toggleTheme() {
-  const cur = getTheme();
-  const next = cur === "light" ? "dark" : cur === "dark" ? "auto" : "light";
+  const current = getTheme();
+  const next =
+    current === "light" ? "dark" : current === "dark" ? "auto" : "light";
   setTheme(next);
   showToast(`Theme: ${next}`);
 }
 
 // ---------------------------
-// Student history
+// Load recent students
 // ---------------------------
 function loadRecentStudents() {
   try {
@@ -146,7 +152,7 @@ function renderRecentStudents() {
 }
 
 // ---------------------------
-// Save/load UI state
+// Save/Load state
 // ---------------------------
 function saveState() {
   const state = {
@@ -164,15 +170,16 @@ function saveState() {
 
 function loadState() {
   try {
-    const s = JSON.parse(localStorage.getItem(STATE_KEY));
-    if (!s) return null;
+    const state = JSON.parse(localStorage.getItem(STATE_KEY));
+    if (!state) return null;
 
-    nameInput.value = s.name || "";
-    teacherEmailInput.value = s.teacherEmail || "";
-    customTeacherNameInput.value = s.customTeacherName || "";
-    customProjectInput.value = s.customProject || "";
-    customTextInput.value = s.customText || "";
-    return s;
+    nameInput.value = state.name || "";
+    teacherEmailInput.value = state.teacherEmail || "";
+    customTeacherNameInput.value = state.customTeacherName || "";
+    customProjectInput.value = state.customProject || "";
+    customTextInput.value = state.customText || "";
+
+    return state;
   } catch {
     return null;
   }
@@ -182,38 +189,48 @@ function loadState() {
 // Load selections.json
 // ---------------------------
 async function loadSelections() {
-  const res = await fetch("selections.json", { cache: "no-store" });
-  selections = await res.json();
+  try {
+    const res = await fetch("selections.json", { cache: "no-store" });
+    selections = await res.json();
+  } catch {
+    showToast("Could not load teacher list.", false);
+    selections = { teachers: [], subjects: [], projects: [] };
+  }
 
   populateTeachers();
   populateSubjects();
 
-  const s = loadState();
+  const state = loadState();
 
-  if (s) {
-    subjectSelect.value = s.subjectId;
-    populateProjects(s.subjectId);
-    projectSelect.value = s.projectId;
-    teacherSelect.value = s.teacherId;
+  if (state) {
+    if (state.subjectId) subjectSelect.value = state.subjectId;
+    populateProjects(state.subjectId);
+
+    if (state.projectId) projectSelect.value = state.projectId;
+    if (state.teacherId) teacherSelect.value = state.teacherId;
+
     updateTeacherFromSelect();
   } else {
     populateProjects(subjectSelect.value);
   }
 
-  updateOverlay();
   renderTeacherList();
+  updateOverlay();
 }
 
-// ---------------------------
-// Dropdown building
-// ---------------------------
+// Teachers dropdown
 function populateTeachers() {
   teacherSelect.innerHTML = "";
-  selections.teachers.forEach((t) =>
-    teacherSelect.appendChild(new Option(t.name, t.id))
-  );
-  teacherSelect.appendChild(new Option("──────────", "", true, false));
-  teacherSelect.lastChild.disabled = true;
+  selections.teachers.forEach((t) => {
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = t.name;
+    teacherSelect.appendChild(opt);
+  });
+
+  const divider = new Option("──────────", "", true, false);
+  divider.disabled = true;
+  teacherSelect.appendChild(divider);
 
   teacherSelect.appendChild(new Option("Other teacher (custom)", "__custom"));
 
@@ -232,19 +249,22 @@ function updateTeacherFromSelect() {
   }
 }
 
+// Subjects dropdown
 function populateSubjects() {
   subjectSelect.innerHTML = "";
-  selections.subjects.forEach((s) =>
-    subjectSelect.appendChild(new Option(s.label, s.id))
-  );
+  selections.subjects.forEach((s) => {
+    subjectSelect.appendChild(new Option(s.label, s.id));
+  });
+
   subjectSelect.appendChild(new Option("──────────", "", true, false));
   subjectSelect.lastChild.disabled = true;
 
-  subjectSelect.appendChild(new Option("Other subject/context", "__custom"));
+  subjectSelect.appendChild(new Option("Other subject / context", "__custom"));
 
   subjectSelect.value = selections.subjects[0]?.id || "";
 }
 
+// Projects dropdown
 function populateProjects(subjectId) {
   projectSelect.innerHTML = "";
 
@@ -257,29 +277,31 @@ function populateProjects(subjectId) {
   projectSelect.appendChild(new Option("──────────", "", true, false));
   projectSelect.lastChild.disabled = true;
 
-  projectSelect.appendChild(new Option("Custom project/task", "__custom"));
+  projectSelect.appendChild(new Option("Other project / task", "__custom"));
 
   customProjectGroup.style.display =
-    subjectId === "__custom" ||
-    projectSelect.value === "__custom"
-      ? ""
-      : "none";
+    subjectId === "__custom" ? "" : projectSelect.value === "__custom" ? "" : "none";
 }
 
+// Teacher list display
 function renderTeacherList() {
   teacherListEl.innerHTML = "";
   selections.teachers.forEach((t) => {
     const li = document.createElement("li");
-    li.innerHTML = `<strong>${t.name}</strong>
-      <div class="small">${t.email}</div>`;
+    li.innerHTML = `
+      <strong>${t.name}</strong>
+      <div class="small">${t.email || "No email"}</div>
+    `;
     teacherListEl.appendChild(li);
   });
 }
+
 // ---------------------------
-// Overlay text
+// Stamp overlay
 // ---------------------------
 function getNowStampDisplay() {
-  return new Date().toLocaleString(undefined, {
+  const now = new Date();
+  return now.toLocaleString(undefined, {
     year: "numeric",
     month: "short",
     day: "2-digit",
@@ -289,12 +311,11 @@ function getNowStampDisplay() {
 }
 
 function buildStampLines() {
-  const student = nameInput.value.trim() || "Student";
+  const student = (nameInput.value || "").trim() || "Student";
   const teacher =
     teacherSelect.value === "__custom"
       ? customTeacherNameInput.value || "Teacher"
-      : selections.teachers.find((t) => t.id === teacherSelect.value)?.name ||
-        "Teacher";
+      : selections.teachers.find((t) => t.id === teacherSelect.value)?.name || "Teacher";
 
   const line1 = `${student} – ${teacher}`;
   const line2 = `Pukekohe High School • ${getNowStampDisplay()}`;
@@ -309,60 +330,55 @@ function buildStampLines() {
       projectSelect.value === "__custom"
         ? customProjectInput.value
         : selections.projects.find((p) => p.id === projectSelect.value)?.label;
-    line3 = subj && proj ? `${subj} • ${proj}` : subj || proj || "Learning Evidence";
+
+    line3 = subj && proj ? `${subj} • ${proj}` : subj || proj || "Learning evidence";
   }
 
   return [line1, line2, line3];
 }
 
 function updateOverlay() {
-  const [a, b, c] = buildStampLines();
-  overlayTextEl.innerHTML = `<span>${a}<br>${b}<br>${c}</span>`;
+  const [l1, l2, l3] = buildStampLines();
+  overlayTextEl.innerHTML = `<span>${l1}<br>${l2}<br>${l3}</span>`;
   saveState();
 }
 
 // ---------------------------
-// CAMERA — enumerateDevices + Option B logic
+// CAMERA (flip with enumerateDevices)
 // ---------------------------
 async function ensureVideoDevices() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  videoDevices = devices.filter((d) => d.kind === "videoinput");
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    videoDevices = devices.filter((d) => d.kind === "videoinput");
 
-  const backIndex = videoDevices.findIndex((d) =>
-    /back|environment|rear/i.test(d.label)
-  );
-  if (backIndex >= 0) currentDeviceIndex = backIndex;
+    const backIndex = videoDevices.findIndex((d) =>
+      /back|rear|environment/i.test(d.label)
+    );
+    if (backIndex >= 0) currentDeviceIndex = backIndex;
+  } catch {}
 }
 
-async function initCamera() {
-  if (!navigator.mediaDevices) return showToast("No camera", false);
-
-  await ensureVideoDevices();
+async function initCamera(facingMode) {
   stopCamera();
+
+  if (!videoDevices.length) await ensureVideoDevices();
 
   let constraints = { audio: false, video: {} };
 
   if (videoDevices.length) {
-    constraints.video.deviceId = {
-      exact: videoDevices[currentDeviceIndex].deviceId,
-    };
+    constraints.video.deviceId = { exact: videoDevices[currentDeviceIndex].deviceId };
   } else {
-    constraints.video.facingMode = { ideal: "environment" };
+    constraints.video.facingMode = { ideal: facingMode || "environment" };
   }
 
   try {
     stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-    // Mark that permission was granted
-    localStorage.setItem(CAM_PERMISSION_KEY, "yes");
-
     video.srcObject = stream;
     await video.play();
-
     shootBtn.disabled = false;
     showToast("Camera ready");
-  } catch (err) {
-    showToast("Camera blocked", false);
+  } catch {
+    showToast("Camera failed.", false);
   }
 }
 
@@ -374,138 +390,23 @@ function stopCamera() {
 
 async function flipCamera() {
   if (!requireStudentName()) return;
-
   if (!videoDevices.length) await ensureVideoDevices();
-  if (videoDevices.length <= 1)
-    return showToast("Only one camera", false);
-
+  if (videoDevices.length <= 1) {
+    showToast("Only one camera available.", false);
+    return;
+  }
   currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
   await initCamera();
 }
 
 // ---------------------------
-// Stamping
+// STAMPING
 // ---------------------------
-function drawStamped(w, h, drawFn) {
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-
-  // Draw the base image (video frame or uploaded file)
-  drawFn(ctx);
-
-  // Size + layout
-  const pad = Math.round(w * 0.02);
-
-  // Clamp font size so it looks similar across devices
-  const approx = h * 0.03;
-  const fontSize = Math.round(Math.max(18, Math.min(approx, 32))); // between 18px and 32px
-  const boxH = fontSize * 4; // room for 3 lines + padding
-
-  const x = pad;
-  const y = h - boxH - pad;
-  const boxW = Math.round(w * 0.8);
-
-  const [l1, l2, l3] = buildStampLines();
-
-  // We’ll draw the shield if we can load it, otherwise fall back to text-only
-  const crestImg = new Image();
-  // Use your existing app icon as the shield image
-  crestImg.src = "icon-192.png";  // make sure icon-192.png is in the same folder as index.html
-
-  crestImg.onload = () => {
-    // Gradient background
-    const g = ctx.createLinearGradient(x, y + boxH, x, y);
-    g.addColorStop(0, "rgba(15,23,42,0.95)");
-    g.addColorStop(0.7, "rgba(15,23,42,0.7)");
-    g.addColorStop(1, "transparent");
-    ctx.fillStyle = g;
-    ctx.fillRect(x, y, boxW, boxH);
-
-    // Draw shield on the left side inside the box
-    const crestSize = boxH - pad * 2;
-    const crestX = x + pad;
-    const crestY = y + pad;
-    ctx.drawImage(crestImg, crestX, crestY, crestSize, crestSize);
-
-    // Text
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "top";
-    ctx.font = `${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-
-    let ty = y + pad;
-    const tx = x + boxW - pad;
-    ctx.fillText(l1, tx, ty);
-    ty += fontSize + 2;
-    ctx.fillText(l2, tx, ty);
-    ty += fontSize + 2;
-    ctx.fillText(l3, tx, ty);
-
-    finishStampedBlob();
-  };
-
-  crestImg.onerror = () => {
-    // If the shield can't load, fall back to the old text-only box
-    const g = ctx.createLinearGradient(x, y + boxH, x, y);
-    g.addColorStop(0, "rgba(15,23,42,0.95)");
-    g.addColorStop(0.7, "rgba(15,23,42,0.7)");
-    g.addColorStop(1, "transparent");
-    ctx.fillStyle = g;
-    ctx.fillRect(x, y, boxW, boxH);
-
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "top";
-    ctx.font = `${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-
-    let ty = y + pad;
-    const tx = x + boxW - pad;
-    ctx.fillText(l1, tx, ty);
-    ty += fontSize + 2;
-    ctx.fillText(l2, tx, ty);
-    ty += fontSize + 2;
-    ctx.fillText(l3, tx, ty);
-
-    finishStampedBlob();
-  };
-
-  // common “save to blob + preview” code
-  function finishStampedBlob() {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        showToast("Could not create image", false);
-        return;
-      }
-
-      lastBlob = blob;
-      if (lastObjectUrl) {
-        URL.revokeObjectURL(lastObjectUrl);
-      }
-      lastObjectUrl = URL.createObjectURL(blob);
-
-      const now = new Date();
-      const nm = nameInput.value.trim().replace(/\s+/g, "_") || "student";
-
-      lastMeta = {
-        filename: `PHS_${nm}_${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}.png`,
-        type: blob.type,
-      };
-
-      previewImg.src = lastObjectUrl;
-      shareBtn.disabled = false;
-      downloadBtn.disabled = false;
-      addRecentStudent(nameInput.value.trim());
-    });
-  }
-}
-
-
 function stampFromVideo() {
   if (!requireStudentName()) return;
-  if (!video.videoWidth) return showToast("Camera not ready", false);
+  if (!video.videoWidth) return showToast("Camera not ready.", false);
 
-  drawStamped(video.videoWidth, video.videoHeight, (ctx) =>
+  drawStampedImage(video.videoWidth, video.videoHeight, (ctx) =>
     ctx.drawImage(video, 0, 0)
   );
 }
@@ -514,39 +415,95 @@ function stampFromFile(file) {
   if (!requireStudentName()) return;
   const img = new Image();
   img.onload = () => {
-    const maxDim = 1920;
+    const max = 1920;
     let w = img.width,
       h = img.height;
-
-    if (Math.max(w, h) > maxDim) {
-      const scale = maxDim / Math.max(w, h);
-      w = Math.round(w * scale);
-      h = Math.round(h * scale);
+    if (w > max || h > max) {
+      const s = max / Math.max(w, h);
+      w = Math.round(w * s);
+      h = Math.round(h * s);
     }
-
-    drawStamped(w, h, (ctx) => ctx.drawImage(img, 0, 0, w, h));
+    drawStampedImage(w, h, (ctx) => ctx.drawImage(img, 0, 0, w, h));
   };
   img.src = URL.createObjectURL(file);
 }
 
+// Draw stamp + export blob
+function drawStampedImage(w, h, drawer) {
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+
+  drawer(ctx);
+
+  const pad = Math.round(w * 0.02);
+  const lh = Math.round(h * 0.03);
+  const boxH = lh * 4;
+  const x = pad;
+  const y = h - boxH - pad;
+  const boxW = Math.round(w * 0.8);
+
+  const g = ctx.createLinearGradient(x, y + boxH, x, y);
+  g.addColorStop(0, "rgba(15,23,42,0.95)");
+  g.addColorStop(0.7, "rgba(15,23,42,0.7)");
+  g.addColorStop(1, "transparent");
+
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, boxW, boxH);
+
+  const [l1, l2, l3] = buildStampLines();
+
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "top";
+
+  let ty = y + pad;
+  const tx = x + boxW - pad;
+
+  ctx.font = `${lh}px system-ui`;
+  ctx.fillText(l1, tx, ty);
+  ty += lh + 2;
+  ctx.fillText(l2, tx, ty);
+  ty += lh + 2;
+  ctx.fillText(l3, tx, ty);
+
+  canvas.toBlob((blob) => {
+    lastBlob = blob;
+    lastObjectUrl && URL.revokeObjectURL(lastObjectUrl);
+    lastObjectUrl = URL.createObjectURL(blob);
+
+    const now = new Date();
+    const nm = nameInput.value.trim().replace(/\s+/g, "_") || "student";
+
+    lastMeta = {
+      filename: `PHS_${nm}_${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}.png`,
+      type: blob.type,
+    };
+
+    previewImg.src = lastObjectUrl;
+    shareBtn.disabled = false;
+    downloadBtn.disabled = false;
+    addRecentStudent(nameInput.value.trim());
+  });
+}
+
 // ---------------------------
-// Share + Download
+// SHARE / DOWNLOAD
 // ---------------------------
 async function shareStamped() {
-  if (!lastBlob) return showToast("Nothing to share", false);
-  const file = new File([lastBlob], lastMeta.filename, {
-    type: lastMeta.type,
-  });
+  if (!lastBlob) return showToast("Nothing to share.", false);
+  const file = new File([lastBlob], lastMeta.filename, { type: lastMeta.type });
 
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    await navigator.share({ files: [file] });
+    await navigator.share({ files: [file], title: "PHS Evidence" });
+    showToast("Shared");
   } else {
     downloadStamped();
   }
 }
 
 function downloadStamped() {
-  if (!lastObjectUrl) return;
+  if (!lastObjectUrl) return showToast("Nothing to download.", false);
   const a = document.createElement("a");
   a.href = lastObjectUrl;
   a.download = lastMeta.filename;
@@ -554,16 +511,12 @@ function downloadStamped() {
 }
 
 // ---------------------------
-// INIT — Option B Logic
+// INIT EVENTS
 // ---------------------------
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
   setTheme(getTheme());
   loadRecentStudents();
   loadSelections();
-
-
-
-  initBtn.addEventListener("click", () => initCamera());
 
   nameInput.addEventListener("input", updateOverlay);
 
@@ -580,33 +533,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateOverlay();
   });
 
-  projectSelect.addEventListener("change", () => {
-    customProjectGroup.style.display =
-      subjectSelect.value === "__custom" ||
-      projectSelect.value === "__custom"
-        ? ""
-        : "none";
-    updateOverlay();
-  });
-
+  projectSelect.addEventListener("change", updateOverlay);
   customProjectInput.addEventListener("input", updateOverlay);
   customTextInput.addEventListener("input", updateOverlay);
 
+  initBtn.addEventListener("click", () => initCamera());
+
+  flipBtn.addEventListener("click", () => flipCamera());
+
   fileStampBtn.addEventListener("click", () => {
     const file = fileInput.files?.[0];
-    if (!file) return showToast("Pick a file first", false);
+    if (!file) return showToast("Choose a file first.", false);
     stampFromFile(file);
   });
 
   shootBtn.addEventListener("click", stampFromVideo);
-  flipBtn.addEventListener("click", flipCamera);
 
   shareBtn.addEventListener("click", shareStamped);
   downloadBtn.addEventListener("click", downloadStamped);
 
   clearBtn.addEventListener("click", () => {
-    previewImg.src = "";
     lastBlob = null;
+    previewImg.src = "";
     shareBtn.disabled = true;
     downloadBtn.disabled = true;
     showToast("Cleared");
@@ -615,7 +563,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   themeBtn.addEventListener("click", toggleTheme);
 
   if (installBtn) {
-    installBtn.addEventListener("click", () => deferredPrompt?.prompt());
+    installBtn.addEventListener("click", () => {
+      deferredPrompt?.prompt();
+    });
   }
 
   copyEmailBtn.addEventListener("click", async () => {

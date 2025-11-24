@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <title>PHS Evidence Stamper</title>
 
   <!-- PWA -->
@@ -12,29 +13,31 @@
   <link rel="icon" sizes="192x192" href="icon-192.png">
   <link rel="icon" sizes="512x512" href="icon-512.png">
 
+  <!-- Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div id="app">
 
-  <!-- HEADER (small + clean) -->
-  <header class="app-header" style="margin-bottom:12px;">
-    <h1 class="app-title" style="font-size:1.3rem;margin-bottom:6px;">PHS Evidence Stamper</h1>
+  <!-- HEADER -->
+  <header class="app-header" style="margin-bottom:16px;">
+    <h1 class="app-title" style="font-size:1.3rem;margin-bottom:6px;">
+      PHS Evidence Stamper
+    </h1>
 
     <div class="btn-row">
-      <button id="initBtn" class="primary">
-        📷 Enable Camera
-      </button>
-      <button id="themeBtn" class="ghost" type="button">🌓</button>
-      <button id="installBtn" class="ghost" type="button" style="display:none;">⬇️ Install</button>
+      <button id="initBtn" class="primary">📷 Enable Camera</button>
+      <button id="themeBtn" class="ghost">🌓</button>
+      <button id="installBtn" class="ghost" style="display:none;">⬇️ Install</button>
     </div>
+
     <div id="toast" class="toast"></div>
   </header>
 
-  <!-- MAIN GRID -->
+  <!-- MAIN CONTENT -->
   <section class="grid">
 
-    <!-- 1) CAMERA + CAPTURE -->
+    <!-- CAMERA -->
     <div class="panel stack">
       <h2>Camera</h2>
 
@@ -51,28 +54,28 @@
         </div>
       </div>
 
-      <!-- Capture buttons directly under preview -->
       <div class="btn-row" style="margin-top:10px;">
         <button id="shootBtn" class="primary" disabled>📸 Capture & Stamp</button>
         <button id="flipBtn" class="ghost">🔄 Flip</button>
       </div>
 
-      <!-- File input directly below camera -->
-      <div class="row row--2" style="margin-top:8px;">
+      <div class="row row--2" style="margin-top:10px;">
         <div class="stack">
           <label for="fileInput">Upload a photo</label>
           <input id="fileInput" type="file" accept="image/*">
         </div>
+
         <div class="stack">
           <label>&nbsp;</label>
-          <button id="fileStampBtn" type="button">Stamp File</button>
+          <button id="fileStampBtn">Stamp File</button>
         </div>
       </div>
     </div>
 
-    <!-- 2) RESULT -->
+    <!-- RESULT -->
     <div class="panel stack">
       <h2>Result</h2>
+
       <img id="preview" class="media" alt="Stamped image appears here">
 
       <div class="btn-row" style="margin-top:10px;">
@@ -82,7 +85,7 @@
       </div>
     </div>
 
-    <!-- 3) FORM -->
+    <!-- FORM -->
     <div class="panel stack">
       <h2>Details</h2>
 
@@ -97,6 +100,7 @@
           <label for="teacherSelect">Teacher</label>
           <select id="teacherSelect"></select>
         </div>
+
         <div class="stack">
           <label for="teacherEmail">Email</label>
           <input id="teacherEmail" type="email">
@@ -119,6 +123,7 @@
           <label for="subjectSelect">Subject</label>
           <select id="subjectSelect"></select>
         </div>
+
         <div class="stack">
           <label for="projectSelect">Project</label>
           <select id="projectSelect"></select>
@@ -136,7 +141,7 @@
       </div>
     </div>
 
-    <!-- TEACHER LIST (kept for debugging / admin) -->
+    <!-- TEACHER LIST -->
     <div class="panel stack">
       <h2>Teachers</h2>
       <ul id="teacherList" class="teachers"></ul>
@@ -146,12 +151,14 @@
 </div>
 
 <script src="script.js"></script>
+
 <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js');
-    });
-  }
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js');
+  });
+}
 </script>
+
 </body>
 </html>

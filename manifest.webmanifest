@@ -1,8 +1,8 @@
 {
-  "name": "Pukekohe HS Photo Stamper",
-  "short_name": "PHS Photo",
-  "start_url": "/phsphoto/",
-  "scope": "/phsphoto/",
+  "name": "Pukekohe HS Soft Materials Photo Stamper",
+  "short_name": "PHS Photofab",
+  "start_url": "/phsphotofab/",
+  "scope": "/phsphotofab/",
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#111827",

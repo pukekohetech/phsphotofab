@@ -1,142 +1,81 @@
 {
   "teachers": [
     {
-      "id": "ry",
-      "name": "Mr Reynolds",
-      "email": "ry@pukekohehigh.school.nz",
-      "subjects": [
-        "9ttec",
-        "10ttec",
-        "9tdvc",
-        "10tdvc",
-        "11tdvc",
-        "12tdvc",
-        "13tdvc",
-        "1tegr",
-        "2tegr",
-        "3tegr",
-        "1tbld",
-        "2tbld",
-        "2bldt"
-      ]
+      "id": "mbr",
+      "name": "Mrs M Bernarte",
+      "email": null,
+      "subjects": ["9fnt", "10fnt", "1tcat"]
     },
     {
-      "id": "ncc",
-      "name": "Mr Nicholls",
-      "email": "ncc@pukekohehigh.school.nz",
-      "subjects": [
-        "1tegr",
-        "2tegr",
-        "3tegr",
-        "9ttec",
-        "10ttec"
-      ]
+      "id": "lfu",
+      "name": "Mrs L Fulford",
+      "email": null,
+      "subjects": ["9fnt", "10fnt", "2tcat"]
     },
     {
-      "id": "kpc",
-      "name": "Mr Knapman",
-      "email": "kpc@pukekohehigh.school.nz",
-      "subjects": [
-        "1tegr",
-        "2tegr",
-        "3tegr"
-      ]
+      "id": "cja",
+      "name": "Mrs C Jacobs",
+      "email": null,
+      "subjects": ["9fnt", "2tcat", "3tcat"]
     },
     {
-      "id": "rnr",
-      "name": "Mr Ranson",
-      "email": "rnr@pukekohehigh.school.nz",
-      "subjects": [
-        "1tbld",
-        "2tbld",
-        "2bldt",
-        "9ttec",
-        "10ttec"
-      ]
+      "id": "tma",
+      "name": "Miss T Madelozo",
+      "email": null,
+      "subjects": ["10fnt", "1tcat", "3tcat"]
     },
     {
-      "id": "msl",
-      "name": "Mrs Mous",
-      "email": "dvm@pukekohehigh.school.nz",
-      "subjects": [
-        "9ttec",
-        "10ttec"
-      ]
-    },
-    {
-      "id": "dvm",
-      "name": "Mrs Devaney",
-      "email": "dvm@pukekohehigh.school.nz",
-      "subjects": [
-        "9tdvc",
-        "10tdvc",
-        "11tdvc",
-        "12tdvc",
-        "13tdvc"
-      ]
+      "id": "hrr",
+      "name": "Miss Herasha Randhir",
+      "email": null,
+      "subjects": ["9fnt", "10fnt", "3tcat", "hosptr"]
     }
   ],
   "subjects": [
-    { "id": "9ttec",  "label": "Year 9 Technology (9TTEC)" },
-    { "id": "10ttec", "label": "Year 10 Technology (10TTEC)" },
+    { "id": "9fnt", "label": "Year 9 Food & Nutrition (9FNT)" },
+    { "id": "10fnt", "label": "Year 10 Food & Nutrition (10FNT)" },
 
-    { "id": "9tdvc",  "label": "Year 9 DVC (9TDVC)" },
-    { "id": "10tdvc", "label": "Year 10 DVC (10TDVC)" },
-    { "id": "11tdvc", "label": "Level 1 DVC (11TDVC)" },
-    { "id": "12tdvc", "label": "Level 2 DVC (12TDVC)" },
-    { "id": "13tdvc", "label": "Level 3 DVC (13TDVC)" },
+    { "id": "1tcat", "label": "Level 1 Catering (1TCAT)" },
+    { "id": "2tcat", "label": "Level 2 Catering (2TCAT)" },
+    { "id": "3tcat", "label": "Level 3 Catering (3TCAT)" },
 
-    { "id": "1tegr",  "label": "Level 1 Engineering (1TEGR)" },
-    { "id": "2tegr",  "label": "Level 2 Engineering (2TEGR)" },
-    { "id": "3tegr",  "label": "Level 3 Engineering (3TEGR)" },
-
-    { "id": "1tbld",  "label": "Level 1 Building (1TBLD)" },
-    { "id": "2tbld",  "label": "Level 2 Building (2TBLD)" },
-    { "id": "2bldt",  "label": "Building Trades (2BLDT)" }
+    { "id": "hosptr", "label": "Hospitality / Trades (HOSPTR)" }
   ],
   "projects": [
-    { "id": "9ttec_electric_circuit", "subjectId": "9ttec", "label": "Electric Circuit" },
-    { "id": "9ttec_photo_frame",      "subjectId": "9ttec", "label": "Photo Frame" },
-    { "id": "9ttec_folding_stool",    "subjectId": "9ttec", "label": "Folding Stool" },
-    { "id": "9ttec_matariki",         "subjectId": "9ttec", "label": "Matariki" },
+    { "id": "9fnt_outcome_1", "subjectId": "9fnt", "label": "Outcome 1" },
+    { "id": "9fnt_outcome_2", "subjectId": "9fnt", "label": "Outcome 2" },
+    { "id": "9fnt_outcome_3", "subjectId": "9fnt", "label": "Outcome 3" },
+    { "id": "9fnt_outcome_4", "subjectId": "9fnt", "label": "Outcome 4" },
+    { "id": "9fnt_outcome_5", "subjectId": "9fnt", "label": "Outcome 5" },
 
-    { "id": "10ttec_pewter_casting",    "subjectId": "10ttec", "label": "Pewter Casting" },
-    { "id": "10ttec_modular_furniture", "subjectId": "10ttec", "label": "Modular Furniture" },
-    { "id": "10ttec_picnic_table",      "subjectId": "10ttec", "label": "Picnic Table" },
+    { "id": "10fnt_outcome_1", "subjectId": "10fnt", "label": "Outcome 1" },
+    { "id": "10fnt_outcome_2", "subjectId": "10fnt", "label": "Outcome 2" },
+    { "id": "10fnt_outcome_3", "subjectId": "10fnt", "label": "Outcome 3" },
+    { "id": "10fnt_outcome_4", "subjectId": "10fnt", "label": "Outcome 4" },
+    { "id": "10fnt_outcome_5", "subjectId": "10fnt", "label": "Outcome 5" },
 
-    { "id": "9tdvc_own",  "subjectId": "9tdvc",  "label": "Own project", "allowCustomName": true },
-    { "id": "10tdvc_own", "subjectId": "10tdvc", "label": "Own project", "allowCustomName": true },
+    { "id": "1tcat_outcome_1", "subjectId": "1tcat", "label": "Outcome 1" },
+    { "id": "1tcat_outcome_2", "subjectId": "1tcat", "label": "Outcome 2" },
+    { "id": "1tcat_outcome_3", "subjectId": "1tcat", "label": "Outcome 3" },
+    { "id": "1tcat_outcome_4", "subjectId": "1tcat", "label": "Outcome 4" },
+    { "id": "1tcat_outcome_5", "subjectId": "1tcat", "label": "Outcome 5" },
 
-    { "id": "11tdvc_spatial_design", "subjectId": "11tdvc", "label": "Spatial Design" },
-    { "id": "11tdvc_own",            "subjectId": "11tdvc", "label": "Own project", "allowCustomName": true },
+    { "id": "2tcat_outcome_1", "subjectId": "2tcat", "label": "Outcome 1" },
+    { "id": "2tcat_outcome_2", "subjectId": "2tcat", "label": "Outcome 2" },
+    { "id": "2tcat_outcome_3", "subjectId": "2tcat", "label": "Outcome 3" },
+    { "id": "2tcat_outcome_4", "subjectId": "2tcat", "label": "Outcome 4" },
+    { "id": "2tcat_outcome_5", "subjectId": "2tcat", "label": "Outcome 5" },
 
-    { "id": "12tdvc_spatial_design", "subjectId": "12tdvc", "label": "Spatial Design" },
-    { "id": "12tdvc_own",            "subjectId": "12tdvc", "label": "Own project", "allowCustomName": true },
+    { "id": "3tcat_outcome_1", "subjectId": "3tcat", "label": "Outcome 1" },
+    { "id": "3tcat_outcome_2", "subjectId": "3tcat", "label": "Outcome 2" },
+    { "id": "3tcat_outcome_3", "subjectId": "3tcat", "label": "Outcome 3" },
+    { "id": "3tcat_outcome_4", "subjectId": "3tcat", "label": "Outcome 4" },
+    { "id": "3tcat_outcome_5", "subjectId": "3tcat", "label": "Outcome 5" },
 
-    { "id": "13tdvc_spatial_design", "subjectId": "13tdvc", "label": "Spatial Design" },
-    { "id": "13tdvc_own",            "subjectId": "13tdvc", "label": "Own project", "allowCustomName": true },
-
-    { "id": "1tegr_pencil_case",   "subjectId": "1tegr", "label": "Pencil Case" },
-    { "id": "1tegr_marking_gauge", "subjectId": "1tegr", "label": "Marking Gauge" },
-    { "id": "1tegr_own",           "subjectId": "1tegr", "label": "Own project", "allowCustomName": true },
-
-    { "id": "2tegr_tool_box",     "subjectId": "2tegr", "label": "Tool Box" },
-    { "id": "2tegr_machine_vice", "subjectId": "2tegr", "label": "Machine Vice" },
-    { "id": "2tegr_other",        "subjectId": "2tegr", "label": "Other / Own project", "allowCustomName": true },
-
-    { "id": "3tegr_handy_trolley",      "subjectId": "3tegr", "label": "Handy Trolley" },
-    { "id": "3tegr_sheet_metal_funnel", "subjectId": "3tegr", "label": "Sheet Metal Funnel" },
-    { "id": "3tegr_own",                "subjectId": "3tegr", "label": "Own project", "allowCustomName": true },
-
-    { "id": "1tbld_file_box",    "subjectId": "1tbld", "label": "File Box" },
-    { "id": "1tbld_tool_box",    "subjectId": "1tbld", "label": "Tool Box" },
-    { "id": "1tbld_planter_box", "subjectId": "1tbld", "label": "Planter Box" },
-    { "id": "1tbld_other",       "subjectId": "1tbld", "label": "Other", "allowCustomName": true },
-
-    { "id": "2tbld_step_ladder",     "subjectId": "2tbld", "label": "Step Ladder" },
-    { "id": "2tbld_cape_cod_rocker", "subjectId": "2tbld", "label": "Cape Cod Rocker" },
-    { "id": "2tbld_other",           "subjectId": "2tbld", "label": "Other", "allowCustomName": true },
-
-    { "id": "2bldt_small_sleepout", "subjectId": "2bldt", "label": "Small Sleepout" }
+    { "id": "hosptr_outcome_1", "subjectId": "hosptr", "label": "Outcome 1" },
+    { "id": "hosptr_outcome_2", "subjectId": "hosptr", "label": "Outcome 2" },
+    { "id": "hosptr_outcome_3", "subjectId": "hosptr", "label": "Outcome 3" },
+    { "id": "hosptr_outcome_4", "subjectId": "hosptr", "label": "Outcome 4" },
+    { "id": "hosptr_outcome_5", "subjectId": "hosptr", "label": "Outcome 5" }
   ]
 }

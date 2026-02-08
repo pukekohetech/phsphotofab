@@ -1,33 +1,33 @@
 {
   "teachers": [
     {
-      "id": "mbr",
+      "id": "BNM",
       "name": "Mrs M Bernarte",
-      "email": null,
+      "email": bnm@pukekohehigh.school.nz,
       "subjects": ["9fnt", "10fnt", "1tcat"]
     },
     {
-      "id": "lfu",
+      "id": "FLL",
       "name": "Mrs L Fulford",
-      "email": null,
+      "email": fll@pukekohehigh.school.nz,
       "subjects": ["9fnt", "10fnt", "2tcat"]
     },
     {
-      "id": "cja",
+      "id": "JC",
       "name": "Mrs C Jacobs",
-      "email": null,
+      "email": jc@pukekohehigh.school.nz,
       "subjects": ["9fnt", "2tcat", "3tcat"]
     },
     {
-      "id": "tma",
+      "id": "MDT",
       "name": "Miss T Madelozo",
-      "email": null,
+      "email": mdt@pukekohehigh.school.nz,
       "subjects": ["10fnt", "1tcat", "3tcat"]
     },
     {
-      "id": "hrr",
+      "id": "RNH",
       "name": "Miss Herasha Randhir",
-      "email": null,
+      "email": rnh@pukekohehigh.school.nz,
       "subjects": ["9fnt", "10fnt", "3tcat", "hosptr"]
     }
   ],

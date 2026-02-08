@@ -26,7 +26,7 @@
 
     <div class="btn-row">
       <button id="initBtn" class="primary">📷 Enable Camera</button>
-      <button id="themeBtn" class="ghost">🌓</button>
+     
       <button id="installBtn" class="ghost" style="display:none;">⬇️ Install</button>
     </div>
 
@@ -40,15 +40,31 @@
     <div class="panel stack">
       <h2>Camera</h2>
 
-      <div class="overlay-wrap">
+      <!-- MEDIA WRAP: video + shield + overlay text -->
+      <div class="media-wrap">
+        <!-- Hidden canvas for processing -->
         <canvas id="canvas" width="1280" height="720" style="display:none;"></canvas>
-        <!-- Adding autoplay to ensure the camera feed appears immediately on
-             Android devices. Without this attribute some versions of
-             mobile Chrome display a blank video element even after
-             calling video.play() in JavaScript. -->
-        <video id="video" class="media" playsinline muted autoplay></video>
 
-        <div id="overlayText" class="stamp-overlay">
+        <!-- Live camera feed -->
+        <video
+          id="video"
+          class="media"
+          playsinline
+          muted
+          autoplay
+        ></video>
+
+        <!-- Shield overlay to match stamped image -->
+        <img
+          id="shieldOverlay"
+          src="phs-shield.png"
+          class="shield-overlay"
+          alt=""
+          aria-hidden="true"
+        />
+
+        <!-- WYSIWYG text overlay (updated by script.js) -->
+        <div id="overlayText" class="stamp-overlay" aria-hidden="true">
           <span>
             Student – Teacher<br>
             Pukekohe High School • Time<br>
@@ -130,7 +146,7 @@
         </div>
       </div>
 
-      <div id="customProjectGroup" class="stack" style="display:none;">
+      <div id="customProjectGroup" class="stack" style="display:none%;">
         <label for="customProjectInput">Custom project</label>
         <input id="customProjectInput">
       </div>

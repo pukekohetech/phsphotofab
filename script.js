@@ -1,10 +1,11 @@
+
 /**************************************************************
- *  Pukekohe HS – Evidence Stamper (Shield + Sharper Images)
- *  • Camera now reliable on Chrome, Android, iOS Safari, PWA
+ *  Pukekohe HS – Evidence Stamper (Android-safe Camera + Shield)
+ *  • Simple, reliable camera init (like your old version)
+ *  • Android-friendly capture via offscreen canvas → Image
  *  • Preview ALWAYS works (toBlob fallback + safe delays)
- *  • Shield restored on stamped image
- *  • Higher-res capture for camera + file input
- *  • All IDs, UI behaviours, and logic preserved exactly
+ *  • Shield/logo restored on stamped image
+ *  • All IDs, UI behaviours, and logic preserved
  **************************************************************/
 
 // ---------------------------
@@ -58,33 +59,20 @@ const STATE_KEY = "phs-photo-last-state";
 let selections = { teachers: [], subjects: [], projects: [] };
 
 let stream = null;
-let videoDevices = [];
-let currentDeviceIndex = 0;
-
 let lastBlob = null;
 let lastObjectUrl = null;
 let lastMeta = null;
 
 let deferredPrompt = null;
 let recentStudents = [];
+let useFrontCamera = false; // for simple flip between front/back
 
 // ---------------------------
 // Logo / Shield
 // ---------------------------
-/**
- * Load the crest used in the stamped image. In the original
- * implementation the code attempted to load a non‑existent
- * `phs-shield.png`. This prevented the crest from appearing on
- * the final stamped photo and produced console warnings. To
- * restore the shield we copy one of the supplied crest assets
- * (see the README for available sizes) into `phs-shield.png` in
- * the project root. If you update the crest in the future, be
- * sure to mirror it here as well.
- */
 const logoImg = new Image();
 let logoReady = false;
-// Always load the shield using a stable file name. A copy of
-// `crest-512.png` is provided at build time as `phs-shield.png`.
+// Adjust this path to your real shield asset
 logoImg.src = "phs-shield.png";
 
 logoImg.onload = () => {
@@ -114,7 +102,7 @@ function showToast(message, ok = true, duration = 2400) {
 function requireStudentName() {
   const name = (nameInput?.value || "").trim();
   if (!name) {
-    showToast("Enter student ID first.", false);
+    showToast("Enter student name first.", false);
     nameInput.focus();
     return false;
   }
@@ -209,7 +197,7 @@ function loadState() {
  * ============================================================*/
 async function loadSelections() {
   try {
-    const res = await fetch("selections.json?v=2", { cache: "no-store" });
+    const res = await fetch("selections.json", { cache: "no-store" });
     selections = await res.json();
   } catch {
     showToast("Could not load teacher list.", false);
@@ -359,91 +347,57 @@ function updateOverlay() {
 }
 
 /* ============================================================
- *  CAMERA (FULLY PATCHED + HIGHER RES)
+ *  CAMERA (OLD-SCHOOL, ANDROID-SAFE STYLE)
+//  - Single getUserMedia call with facingMode
+//  - Optional front/back flip via facingMode toggle
  * ============================================================*/
 function stopCamera() {
   stream?.getTracks().forEach((t) => t.stop());
+  stream = null;
   video.srcObject = null;
   shootBtn.disabled = true;
 }
 
-// Permission-first enumeration (iOS + Chrome fix)
-async function ensureVideoDevices() {
-  try {
-    await navigator.mediaDevices.getUserMedia({ video: true });
-  } catch {
-    showToast("Camera permission is required.", false);
-    return;
-  }
-
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    videoDevices = devices.filter((d) => d.kind === "videoinput");
-
-    const backIndex = videoDevices.findIndex((d) =>
-      /back|rear|environment/i.test(d.label)
-    );
-    if (backIndex >= 0) currentDeviceIndex = backIndex;
-  } catch (err) {
-    console.error(err);
-    showToast("Unable to list cameras.", false);
-  }
-}
-
 async function initCamera() {
-  stopCamera();
-  await ensureVideoDevices();
-
-  let constraints;
-
-  if (videoDevices.length) {
-    const dev = videoDevices[currentDeviceIndex];
-    constraints = {
-      audio: false,
-      video: {
-        deviceId: { exact: dev.deviceId },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      }
-    };
-  } else {
-    constraints = {
-      audio: false,
-      video: {
-        facingMode: "environment",
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      }
-    };
-  }
-
   try {
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
-  } catch {
-    constraints = {
-      audio: false,
-      video: {
-        facingMode: "environment",
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      }
-    };
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
-  }
+    stopCamera();
 
-  video.srcObject = stream;
-  await video.play();
-  shootBtn.disabled = false;
-  showToast("Camera ready");
+    const facingMode = useFrontCamera ? "user" : "environment";
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: facingMode },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+      audio: false,
+    });
+
+    video.srcObject = stream;
+    video.setAttribute("playsinline", "");
+    video.muted = true;
+
+    // Wait for metadata so Android actually has a frame size
+    await new Promise((resolve) => {
+      if (video.readyState >= 1 && video.videoWidth && video.videoHeight) {
+        return resolve();
+      }
+      video.onloadedmetadata = () => resolve();
+    });
+
+    await video.play();
+    console.log("Camera ready", video.videoWidth, video.videoHeight);
+    shootBtn.disabled = false;
+    showToast("Camera ready");
+  } catch (e) {
+    console.error(e);
+    showToast("Camera access denied or failed", false);
+  }
 }
 
 async function flipCamera() {
   if (!requireStudentName()) return;
-
-  if (!videoDevices.length) await ensureVideoDevices();
-  if (videoDevices.length <= 1) return showToast("Only one camera available.", false);
-
-  currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
+  useFrontCamera = !useFrontCamera;
   await initCamera();
 }
 
@@ -459,10 +413,8 @@ function handleStampedBlob(blob) {
 
   lastBlob = blob;
 
-  // Create a fresh URL first
   const newUrl = URL.createObjectURL(blob);
 
-  // Revoke the previous URL after switching
   if (lastObjectUrl && lastObjectUrl !== newUrl) {
     try {
       URL.revokeObjectURL(lastObjectUrl);
@@ -478,7 +430,6 @@ function handleStampedBlob(blob) {
     return;
   }
 
-  // Force refresh even if URL might match previous
   previewImg.removeAttribute("src");
 
   // Small delay improves reliability on Safari / iOS
@@ -503,13 +454,34 @@ function handleStampedBlob(blob) {
 /* ============================================================
  *  STAMPING
  * ============================================================*/
+
+// Android-safe: capture via offscreen canvas → dataURL → Image → stamp
 function stampFromVideo() {
   if (!requireStudentName()) return;
-  if (!video.videoWidth) return showToast("Camera not ready.", false);
 
-  drawStampedImage(video.videoWidth, video.videoHeight, (ctx) =>
-    ctx.drawImage(video, 0, 0)
-  );
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  console.log("stamping from video", vw, vh, video.readyState);
+
+  if (!vw || !vh) {
+    showToast("Camera not ready.", false);
+    return;
+  }
+
+  // Offscreen capture (like your old working code)
+  const off = document.createElement("canvas");
+  off.width = vw;
+  off.height = vh;
+  const offCtx = off.getContext("2d");
+  offCtx.drawImage(video, 0, 0, vw, vh);
+
+  const img = new Image();
+  img.onload = () => {
+    const iw = img.naturalWidth || vw;
+    const ih = img.naturalHeight || vh;
+    drawStampedImage(iw, ih, (ctx) => ctx.drawImage(img, 0, 0, iw, ih));
+  };
+  img.src = off.toDataURL("image/jpeg", 0.95);
 }
 
 function stampFromFile(file) {
@@ -534,69 +506,91 @@ function drawStampedImage(w, h, drawer) {
   canvas.height = h;
   const ctx = canvas.getContext("2d");
 
-  // Use high quality scaling when resizing images. Without this the
-  // canvas may look soft on high DPI screens. Enabling image
-  // smoothing and requesting the highest quality ensures text and
-  // logo render crisply.
-  ctx.imageSmoothingEnabled = true;
-  if (ctx.imageSmoothingQuality) {
-    ctx.imageSmoothingQuality = 'high';
-  }
-
   console.log("Drawing stamped image", { w, h });
 
-  // Draw the base image onto the canvas via the supplied drawer
+  // Draw the base image
   drawer(ctx);
 
-  // Compute sizes relative to the smallest image dimension. Using
-  // minEdge rather than width/height separately yields more
-  // consistent results across portrait/landscape photos and across
-  // devices with varying aspect ratios.
-  const minEdge = Math.min(w, h);
-  const pad = Math.round(minEdge * 0.02);
-  const lh = Math.round(minEdge * 0.03);
-  const logoSize = Math.round(minEdge * 0.12);
+  const [l1, l2, l3] = buildStampLines();
+  const lines = [l1, l2, l3];
 
-  // --- Draw shield / crest in top‑left ---
-  if (logoReady) {
-    ctx.drawImage(logoImg, pad, pad, logoSize, logoSize);
+  // --- layout values (match CSS overlay) ---
+  const base = Math.min(w, h);                    // use min so portrait isn't huge
+  const outerPad = Math.round(base * 0.02);       // ~2% from edges  -> right:2%, bottom:2%
+  const fontSize = Math.max(16, Math.round(base * 0.03)); // ~3% of min dimension
+  const lineHeight = Math.round(fontSize * 1.25);
+  const innerXPad = Math.round(fontSize * 0.45);  // padding inside box
+  const innerYPad = Math.round(fontSize * 0.45);
+
+  ctx.font = `${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+  ctx.textBaseline = "top";
+  ctx.textAlign = "right";
+
+  // Measure text widths so box hugs the text
+  let maxWidth = 0;
+  for (const line of lines) {
+    const measured = ctx.measureText(line).width;
+    if (measured > maxWidth) maxWidth = measured;
   }
 
-  // Dimensions for the gradient box behind the text. We reserve
-  // space for three lines plus a small margin.
-  const boxH = lh * 4;
-  const x = pad;
-  const y = h - boxH - pad;
-  const boxW = Math.round(w * 0.8);
+  const boxHeight = lines.length * lineHeight + innerYPad * 2;
+  const rightX = w - outerPad; // anchor for text / box on the right
 
-  const g = ctx.createLinearGradient(x, y + boxH, x, y);
-  g.addColorStop(0, "rgba(15,23,42,0.95)");
-  g.addColorStop(0.7, "rgba(15,23,42,0.7)");
-  g.addColorStop(1, "transparent");
-  ctx.fillStyle = g;
-  ctx.fillRect(x, y, boxW, boxH);
+  // Limit box width to ~78% like CSS max-width:78%
+  const maxBoxW = w * 0.78;
+  const neededBoxW = maxWidth + innerXPad * 2;
+  const boxW = Math.min(neededBoxW, maxBoxW);
 
-  const [l1, l2, l3] = buildStampLines();
+  const boxX = rightX - boxW;               // box left
+  const boxY = h - boxHeight - outerPad;    // box top
 
+  // --- shield / crest (top-left) ---
+  if (logoReady) {
+    const logoSize = Math.round(base * 0.12);
+    const logoPad = outerPad;
+    ctx.drawImage(logoImg, logoPad, logoPad, logoSize, logoSize);
+  }
+
+  // --- helper for rounded rectangle ---
+  function roundRect(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  // --- gradient box inside rounded rect (matches CSS gradient) ---
+  const grad = ctx.createLinearGradient(boxX, boxY + boxHeight, boxX, boxY);
+  grad.addColorStop(0, "rgba(15,23,42,0.95)");
+  grad.addColorStop(0.7, "rgba(15,23,42,0.7)");
+  grad.addColorStop(1, "transparent");
+
+  ctx.fillStyle = grad;
+  roundRect(ctx, boxX, boxY, boxW, boxHeight, fontSize * 0.4);
+  ctx.fill();
+
+  // --- text aligned to the right, with inner padding ---
   ctx.fillStyle = "#fff";
-  ctx.textAlign = "right";
-  ctx.textBaseline = "top";
+  const textRightX = rightX - innerXPad;
+  let ty = boxY + innerYPad;
 
-  let ty = y + pad;
-  const tx = x + boxW - pad;
-
-  ctx.font = `${lh}px system-ui`;
-  ctx.fillText(l1, tx, ty);
-  ty += lh + 2;
-  ctx.fillText(l2, tx, ty);
-  ty += lh + 2;
-  ctx.fillText(l3, tx, ty);
+  for (const line of lines) {
+    ctx.fillText(line, textRightX, ty);
+    ty += lineHeight;
+  }
 
   // --- SAFARI-SAFE BLOB CREATION ---
   canvas.toBlob((blob) => {
     console.log("canvas.toBlob result:", blob);
     if (!blob) {
-      // Safari fallback using dataURL → blob
       const dataURL = canvas.toDataURL("image/png");
       console.log("Using dataURL fallback");
       fetch(dataURL)
@@ -614,6 +608,7 @@ function drawStampedImage(w, h, drawer) {
     handleStampedBlob(blob);
   });
 }
+
 
 /* ============================================================
  *  SHARE / DOWNLOAD
